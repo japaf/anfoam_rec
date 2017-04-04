@@ -9,7 +9,7 @@ import random
 import math
 import sys
 import json
-import ellipsoidPacking
+import packing_alg3d
 from numpy import pi, sin, cos, mgrid
 #from mayavi import mlab
 

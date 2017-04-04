@@ -1,112 +1,181 @@
 #!/usr/bin/env python
-__author__ = 'jiri'
+
 import json
 import logging
 import os
 import numpy as np
-import NeperAnFoam
-import foam3Dmodel
+import common
+import foam_generate
+import foam_model
+import argparse
+import distutils.spawn as ds
 
-import const
+__name__ = 'anfoam_rec'
+__author__ = 'jiri1kolar'
+__email__ = "jiri1kolar@gmail.com"
+
 #logger setting
-#create file handler
-log = logging.getLogger('anfoamRec')
-log.setLevel(logging.INFO)
-# create file handler which logs even debug messages
-fh=logging.FileHandler('anfoamRec.log')
-fh.setLevel(logging.INFO)
-## create console handler
-ch=logging.StreamHandler()
-ch.setLevel(logging.INFO)
-# create formatter and add it to the handlers
-formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-# add the handlers to the logger
-log.addHandler(fh)
-log.addHandler(ch)
+#set logger
+common.init_logging()
+log = logging.getLogger(__name__)
+
+def check_exec(exec):
+    return ds.find_executable(exec)
+
+def main():
+    exec={'neper':'neper',
+          'evolver': 'evolver',
+          'se_api': 'se_api'}
+    neper_path=check_exec(exec['neper'])
+    se_api_path=check_exec(exec['evolver'])
+    evolver_path=check_exec(exec['se_api'])
+    if neper_path is None:
+        log.error("neper not installed")
+        return 0
+    if se_api_path is None:
+        log.error("se_api not installed")
+        return 0
+    if evolver_path is None:
+        log.error("evolver not installed")
+        return 0
+    configuration=set()
+    if args.config_file != "" and args.config_file is not None:
+        log.info('Loading config file: %s', args.config_file)
+        with open(args.config_file) as data_file:
+            configuration = json.load(data_file)
+        #if ('work-dir' in configuration):
+        #    log.info("Setting working dir to %s",configuration['work-dir'])
+        #    os.chdir(configuration['work-dir'])
+    if args.module=='generate':
+        gen_options={'packing-alg':args.packing_alg,
+                     'grow-alg':args.grow_alg,
+                     'MUX': 0.08,
+                     'MUY': 0.06,
+                     'MUZ': 0.06,
+                     'MUA': 0.0,
+                     'SIGMAX': 0.003,
+                     'SIGMAY': 0.002,
+                     'SIGMAZ': 0.002,
+                     'SIGMAA': 10,
+                     'num-cell':27,
+                     'spheres-per-ellipsoid': 4,
+                     'MUR': 0.08,
+                     'SIGMAR' : 0.003
+                     }
+        if 'MUX' in configuration:
+            gen_options['MUX']=configuration['MUX']
+            gen_options['MUR'] = configuration['MUX']
+        if 'MUY' in configuration:
+            gen_options['MUY']=configuration['MUY']
+        if 'MUZ' in configuration:
+            gen_options['MUZ']=configuration['MUZ']
+        if 'MUR' in configuration:
+            gen_options['MUR']=configuration['MUR']
+        if 'SIGMAX' in configuration:
+            gen_options['SIGMAX']=configuration['SIGMAX']
+            gen_options['SIGMAR'] = configuration['SIGMAX']
+        if 'SIGMAY' in configuration:
+            gen_options['SIGMAY']=configuration['SIGMAY']
+        if 'SIGMAZ' in configuration:
+            gen_options['SIGMAZ']=configuration['SIGMAZ']
+        if 'SIGMAA' in configuration:
+            gen_options['SIGMAA']=configuration['SIGMAA']
+        if 'SIGMAR' in configuration:
+            gen_options['SIGMAR']=configuration['SIGMAR']
+        foam_generate.generate_3d(args.output_file,gen_options)
+
+        # ps=ellipsoidPacking.randSpherePack(0.15,0.01,1,1,1,30,True)
+        # sps1=ellipsoidPacking.sphereGrow(sps,1.05)
+        # els = ellipsoidPacking.randEllipsoidPack(MUX, MUY, MUZ, MUA, SIGMAX, SIGMAY, SIGMAZ, SIGMAA, 1, 1, 1, nS, 10, True)
+        # els2= ellipsoidPacking.ellipsoidGrow(els,1.05)
+        # nEl = NeperAnFoam.laguerre3dperiodic(MUX, MUY, MUZ, MUA, SIGMAX, SIGMAY, SIGMAZ, SIGMAA, nS, 0, True, filename)
 
 
+    #locals().update(data)  # Creates variables from dictionary
+    # change dir to output
+    #os.chdir(mypath)
 
-data={}
-mypath=const.work_path
-with open('input.json') as data_file:
-    data = json.load(data_file)
-locals().update(data) # Creates variables from dictionary
-#change dir to output
-os.chdir(mypath)
+    #memory omezeni?
+    #
+    if args.module=='model':
+        if args.input_file is None or args.input_file=="":
+            log.error("Specify valid geo input-file.")
+            return 0
+        model = foam_model.foam_model()
+        model.initFromGeoFile(args.input_file)
+        #Modeling
+        if args.object_method=='implicit':
+            model.createPrimitivesImplicit(args.limit_num_obj)
+            model.sampleModelImplicit()
+            if (args.save_vox is not None):
+                model.sampleVoxels(args.voxel_resolution)
+        elif args.object_method=='source':
+            model.createPrimitivesSource(args.limit_num_obj)
+            model.sampleModelSource()
+            if (args.save_vox is not None):
+                model.sampleVoxelsSource(args.voxel_resolution)
 
+        #Output
+        if args.save_vox is not None:
+                model.saveAsVox(args.save_vox)
+        if args.save_stl is not None:
+                model.saveAsSTL(args.save_stl)
+        if args.display:
+            model.renderModel()
 
-if tesselation:
-
-    #MUA = 0  # angle
-    SIGMAA = SIGMAA*np.pi / 180
-    nS = 4
-    #ps=ellipsoidPacking.randSpherePack(0.15,0.01,1,1,1,30,True)
-    #sps1=ellipsoidPacking.sphereGrow(sps,1.05)
-    #els = ellipsoidPacking.randEllipsoidPack(MUX, MUY, MUZ, MUA, SIGMAX, SIGMAY, SIGMAZ, SIGMAA, 1, 1, 1, nS, 10, True)
-    #els2= ellipsoidPacking.ellipsoidGrow(els,1.05)
-    model=foam3Dmodel.foamModel()
-    #model.initFromGeoFile('foam_dmpRemoved.geo')
-    #model.initFromGeoFile('foam_modSimple.geo')# foam_modSimple.geo
-    model.initFromGeoFile('foamBig2_final.geo')# foamBig2_final.geo
-    model.createPrimitivesSource(10000)
-    model.sampleModelSource()
-    #model.sampleVoxelsSource(100)
-
-    #Implicit modelling
-    #model.createPrimitivesImplicit(10000)
-    #model.sampleModelImplicit()
-    #model.sampleVoxels(200)
-    #Output
-    #model.saveAsVox('foam_voxelBig.vtk')
-    #model.saveAsSTL('foam_renderedBig.stl')
-    model.renderModel()
-
-    #nEl = NeperAnFoam.laguerre3dperiodic(MUX, MUY, MUZ, MUA, SIGMAX, SIGMAY, SIGMAZ, SIGMAA, nS, 0, True, filename)
-
-
-'''
-    #analyze resulting foam
-    cellSizes = fa.computeCellSize(filename+"_mod")
-    R=fa.analyzeAnizotropyXZXY(cellSizes)
-    print("Average R: {0:f} +- {1:f}".format(R[0],R[1]))
-    cellSizesDir=fa.directionBasedSize(filename+"_ununified_mod",nEl,2*nS+1)
-    Rdir=fa.analyzeAnizotropyXZXY(cellSizesDir)
-    print("Average direction based R: {0:f} +- {1:f}".format(Rdir[0],Rdir[1]))
-    volumes=fa.getVolumes(filename+"_ununified_mod",nEl,2*nS+1)
-    sumVol=0
-
-    eqDiameter=[]
-    x=[]
-    eqDmax=0
-    eqDmin=1
-    for vol in volumes:
-        sumVol+=vol
-    for vol in volumes:
-        d=vol*3/4/np.pi/sumVol
-        d=math.pow(d,1.0/3)*2
-        eqDiameter.append(d)
-    # make histogram
-    hist,min,max,h=fa.getHistogram(10,eqDiameter)
-    volDist_file = os.path.join(mypath, 'eqDiameter_hist.txt')
-    volDistFrac_file = os.path.join(mypath, 'eqDiameter_hist_frac.txt')
-    volDist_out = open(volDist_file, 'w')
-    volDistFrac_out = open(volDistFrac_file, 'w')
-    i=0
-    volDist_out.write("{0:f}\t{1:f}\t{2:f}\t{3:d}\n".format(min, min, min, 0))
-    volDistFrac_out.write("{0:f}\t{1:f}\t{2:f}\t{3:f}\n".format(min, min, min, 0))
-    for val in hist:
-        l=i*h+min
-        i+=1
-        r=i*h+min
-        m=(r+l)/2
-        x.append(m)
-        volDist_out.write("{0:f}\t{1:f}\t{2:f}\t{3:d}\n".format(m,l,r,int(val)))
-        volDistFrac_out.write("{0:f}\t{1:f}\t{2:f}\t{3:f}\n".format(m, l, r, float(val)/nEl))
-    volDist_out.write("{0:f}\t{1:f}\t{2:f}\t{3:d}\n".format(max, max, max, 0))
-    volDistFrac_out.write("{0:f}\t{1:f}\t{2:f}\t{3:f}\n".format(max, max, max, 0))
-    hist=hist/len(eqDiameter)
-    plt.plot(x,hist)
-    plt.show()
-'''
+if __name__ == 'anfoam_rec':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--module",
+                        required=True,
+                        help="Module:\n\tgenerate - generate foam with neper and packing alg.\n\trelax - relax foam in evolver.\n\tmodel - generate 3D foam model",
+                        choices=['generate', 'relax', 'model'],
+                        default="generate")
+    parser.add_argument("-c", "--config-file",
+                        help="Json configuration file",
+                        metavar='FILE',
+                        type=str)
+    parser.add_argument("-i", "--input-file",
+                        help="Input geo file",
+                        metavar='FILE',
+                        type=str)
+    parser.add_argument("-o", "--output-file",
+                        help="Output geo file from Neper",
+                        metavar='FILE',
+                        type=str,
+                        default="foam.geo")
+    parser.add_argument("-p", "--packing-alg",
+                        help="Define packing algorithm",
+                        choices=['sphere-random', 'ellipsoid-random'],
+                        default='sphere-random')
+    parser.add_argument("-g", "--grow-alg",
+                        help="Turn on grow algorihm",
+                        action='store_true')
+    parser.add_argument("-d", "--dimension",
+                        help="Dimension of structure",
+                        type=int,
+                        default=3)
+    parser.add_argument("--object-method",
+                        help="Object method for structure modelling.",
+                        choices=['implicit', 'source'],
+                        default="implicit")
+    parser.add_argument("-r", "--voxel-resolution",
+                        help="Resolution for voxel output",
+                        type=int,
+                        default=100)
+    parser.add_argument("--limit-num-obj",
+                        help="Limit maximal number of rendered objects of each type: vertex,edge,surface.",
+                        type=int,
+                        default=-1)
+    parser.add_argument("-disp", "--display",
+                        help="Display results",
+                        action='store_true')
+    parser.add_argument("--save-vox",
+                        help="Save voxel vtk format",
+                        metavar='FILE',
+                        type=str)
+    parser.add_argument("--save-stl",
+                        help="Save in stl format",
+                        metavar='FILE',
+                        type=str)
+    args = parser.parse_args()
+    main()
