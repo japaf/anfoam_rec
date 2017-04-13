@@ -1,0 +1,29 @@
+{"output-file": "results/foam_test",
+"generate": {
+    "MUX": 0.13,
+    "MUY": 0.1,
+    "MUZ": 0.1,
+	"MUA": 0.0,
+    "SIGMAX": 0.003,
+    "SIGMAY": 0.002,
+    "SIGMAZ": 0.002,
+    "SIGMAA": 15,
+    "spheres-per-ellipsoid": 9,
+    "num-cells": -1,
+    "packing-alg": "elrand",
+    "grow-alg": "True"
+},
+"relax": {
+	"porosity": 0.95,
+    "strut-content": 0.2
+},
+"analyze": {
+	"all": "False",
+	"cell-types": "False",
+	"edge-length": "True",	
+	"anisotropy": "True",
+	"bins": 12
+}}
+
+
+
