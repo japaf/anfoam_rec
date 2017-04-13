@@ -6,17 +6,12 @@ import logging
 import vtk
 from vtk.util.colors import *
 import math
-import os
-import os.path
-
+import argparse
+import common
 import numpy as np
-import packing_alg2d
-import packing_alg3d
 import foam_geoextractor
 
-#load logger
-log=logging.getLogger('anfoam_rec.foam_model')
-
+#load loggingger
 class foam_model:
     def __init__(self):
         self.th=1e-6
@@ -63,7 +58,7 @@ class foam_model:
         foam_geoextractor.writeAsGeo(self.vertexList, self.edgeList, self.surfaceList, self.volumeList, filename)
 
     def createPrimitivesSource(self,imax):
-        log.info("Creating primitive objects...")
+        logging.info("Creating primitive objects...")
         self.primSource_status = True
         rVertex = 0.015
         rEdge = 0.01
@@ -115,7 +110,7 @@ class foam_model:
 
     def createPrimitivesImplicit(self,imax):
         #create primitives at each vertex, edge
-        log.info("Creating primitive objects from implicit functions...")
+        logging.info("Creating primitive objects from implicit functions...")
         self.prim_status=True
         rVertex=0.025
         rEdge=0.024
@@ -173,11 +168,11 @@ class foam_model:
 
     def sampleModelSource(self):
         if not self.primSource_status:
-            log.error("There are no primitive structures to sample.")
+            logging.error("There are no primitive structures to sample.")
             return
         self.sample_status=True
 
-        log.info("Sampling model of implicit functions...")
+        logging.info("Sampling model of implicit functions...")
 
         mapper = vtk.vtkDataSetMapper()
         mapper.SetInputConnection(self.sceneSource.GetOutputPort())
@@ -206,11 +201,11 @@ class foam_model:
 
     def sampleModelImplicit(self):
         if not self.prim_status:
-            log.error("There are no primitive structures to sample.")
+            logging.error("There are no primitive structures to sample.")
             return
         self.sample_status = True
 
-        log.info("Sampling model of implicit functions...")
+        logging.info("Sampling model of implicit functions...")
 
         res = 200  # resolution
         surf = vtk.vtkContourFilter()
@@ -239,10 +234,10 @@ class foam_model:
 
     def sampleVoxels(self,res):
         if not self.prim_status:
-            log.error("There are no primitive structures to sample.")
+            logging.error("There are no primitive structures to sample.")
             return
         self.voxsample_status=True
-        log.info("Sampling voxel model...")
+        logging.info("Sampling voxel model...")
 
         sample = vtk.vtkSampleFunction()
         sample.SetImplicitFunction(self.scene)
@@ -270,10 +265,10 @@ class foam_model:
 
     def sampleVoxelsSource(self,res):
         if not self.primSource_status:
-            log.error("There are no primitive structures to sample.")
+            logging.error("There are no primitive structures to sample.")
             return
         self.voxsample_status=True
-        log.info("Sampling model to voxels...")
+        logging.info("Sampling model to voxels...")
 
         vox = vtk.vtkVoxelModeller()
         vox.SetSampleDimensions(res, res, res)
@@ -289,9 +284,9 @@ class foam_model:
     def renderModel(self):
         # Create the usual rendering stuff
         if not self.sample_status:
-            log.error("There are no sampled data to render.")
+            logging.error("There are no sampled data to render.")
             return
-        log.info("Rendering model...")
+        logging.info("Rendering model...")
         self.render_status=True
         ren = vtk.vtkRenderer()
         renWin = vtk.vtkRenderWindow()
@@ -317,9 +312,9 @@ class foam_model:
     def renderVox(self):
         # Create the usual rendering stuff
         if not self.voxsample_status:
-            log.error("There are no voxel data to render.")
+            logging.error("There are no voxel data to render.")
             return
-        log.info("Rendering voxel model...")
+        logging.info("Rendering voxel model...")
         self.render_status = True
         ren = vtk.vtkRenderer()
         renWin = vtk.vtkRenderWindow()
@@ -603,9 +598,9 @@ class foam_model:
     '''
     def saveAsSTL(self,fileName):
         if not self.sample_status:
-            log.error("There are no sampled data to write to file.")
+            logging.error("There are no sampled data to write to file.")
             return
-        log.info("Saving model to %s in stl format...",fileName)
+        logging.info("Saving model to %s in stl format...",fileName)
         stlWriter = vtk.vtkSTLWriter()
         stlWriter.SetFileName(fileName)
         stlWriter.SetInputConnection(self.outputData.GetOutputPort())
@@ -613,9 +608,9 @@ class foam_model:
 
     def saveAsPLY(self,fileName):
         if not self.sample_status:
-            log.error("There are no sampled data to write to file.")
+            logging.error("There are no sampled data to write to file.")
             return
-        log.info("Saving model to %s in ply format...", fileName)
+        logging.info("Saving model to %s in ply format...", fileName)
         plyWriter = vtk.vtkPLYWriter()
         plyWriter.SetFileName(fileName)
         plyWriter.SetInputConnection(self.outputData.GetOutputPort())
@@ -623,10 +618,72 @@ class foam_model:
 
     def saveAsVox(self,fileName):
         if not self.voxsample_status:
-            log.error("There are no sampled voxel data to write to file.")
+            logging.error("There are no sampled voxel data to write to file.")
             return
-        log.info("Saving model as voxel 3D image to file %s in vtk format...",fileName)
+        logging.info("Saving model as voxel 3D image to file %s in vtk format...",fileName)
         voxWriter=vtk.vtkDataSetWriter()
         voxWriter.SetFileName(fileName)
         voxWriter.SetInputConnection(self.vox.GetOutputPort())
         voxWriter.Write()
+
+def main():
+    common.init_logging()
+    if args.input_file is None or args.input_file == "":
+        logging.error("Specify valid geo input-file.")
+        return 0
+    model = foam_model()
+    model.initFromGeoFile(args.input_file)
+    # Modeling
+    if args.object_method == 'implicit':
+        model.createPrimitivesImplicit(args.limit_num_obj)
+        model.sampleModelImplicit()
+        if (args.save_vox is not None):
+            model.sampleVoxels(args.voxel_resolution)
+    elif args.object_method == 'source':
+        model.createPrimitivesSource(args.limit_num_obj)
+        model.sampleModelSource()
+        if (args.save_vox is not None):
+            model.sampleVoxelsSource(args.voxel_resolution)
+    # Output
+    if args.save_vox is not None:
+        model.saveAsVox(args.save_vox)
+    if args.save_stl is not None:
+        model.saveAsSTL(args.save_stl)
+    if args.display:
+        model.renderModel()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input-file",
+                        help="Input geo file",
+                        metavar='FILE',
+                        type=str)
+    parser.add_argument("-d", "--dimension",
+                        help="Dimension of structure",
+                        type=int,
+                        default=3)
+    parser.add_argument("--object-method",
+                        help="Object method for structure modelling.",
+                        choices=['implicit', 'source'],
+                        default="implicit")
+    parser.add_argument("-r", "--voxel-resolution",
+                        help="Resolution for voxel output",
+                        type=int,
+                        default=100)
+    parser.add_argument("--limit-num-obj",
+                        help="Limit maximal number of rendered objects of each type: vertex,edge,surface.",
+                        type=int,
+                        default=-1)
+    parser.add_argument("-disp", "--display",
+                        help="Display results",
+                        action='store_true')
+    parser.add_argument("--save-vox",
+                        help="Save voxel vtk format",
+                        metavar='FILE',
+                        type=str)
+    parser.add_argument("--save-stl",
+                        help="Save in stl format",
+                        metavar='FILE',
+                        type=str)
+    args = parser.parse_args()
+    main()

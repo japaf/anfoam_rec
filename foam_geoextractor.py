@@ -331,19 +331,26 @@ def addOrientation(vertices,edges,surfaces,volumes):
 
 def getCellCenter(vertices,edges,surfaces,surfL):
     cp = [0.0, 0.0, 0.0]
-    usedIds=[]
-    nvert=0;
+    verts=[]
+    vertsId=[]
     for i in range(len(surfL)):
         surfId = abs(surfL[i])
         edgeL = surfaces[surfId - 1]
         for j in range(len(edgeL)):
-            if (abs(edgeL[j]) in usedIds):
-                continue
-            else:
-                nvert+=1
-                cp += getVertex(edgeL[j], vertices, edges)
-                usedIds.append(abs(edgeL[j]))
-    return cp/nvert
+            edge=edges[abs(edgeL[j])-1]
+            v0Id=edge[0]
+            v1Id=edge[1]
+            v0 = vertices[edge[0] - 1]
+            v1=vertices[edge[1]-1]
+            if v0Id not in vertsId:
+                vertsId.append(v0Id)
+                verts.append(v0)
+            if v1Id not in vertsId:
+                vertsId.append(v1Id)
+                verts.append(v1)
+    for v in verts:
+        cp+=v
+    return cp/len(verts)
 
 def getVector(edgeId,vertices,edges):
     vertL=edges[abs(edgeId)-1]

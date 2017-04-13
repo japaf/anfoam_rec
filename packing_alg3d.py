@@ -36,7 +36,6 @@ class Ellipsoid:
         if n%2==1:
             self.spheres.append(Sphere(self.by,self.pos))
         self.aproxBySpheres((int)(n/2))
-        print(len(self.spheres))
     def aproxBySpheres(self,n):
         #aprox the ellipsoid by 2n+1 spheres
         if n>0:
@@ -177,7 +176,6 @@ def approxEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,xmax,ymax,zmax,nCirc):
     #mayavi_visu.show_els(els)
     return els
 
-
 """
 Ellipsoid packing algorithm - Random sequential adsorption (RSA)
 """
@@ -196,16 +194,14 @@ def randEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el,num_cell):
     xmax= ymax= zmax =1.0
     if num_cell==-1: #generate all
         num_cell=1e9
-    log.info('Generating ellipsoid packing...')
     els=[]
     random.seed()
     ge=GeneratorEllipsoid(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el)
     j = 0
     els_vol = 0
-    timeout = time.time() + 2
+    timeout = time.time() + 5
     while j<num_cell:
         if time.time()>timeout:
-            log.warning('TIMEOUT: Can not place all ellipsoids. Placed: %d',j)
             break
         e0 = ge.getEl()
         inter = False
@@ -307,7 +303,7 @@ def ellipsoidGrow(els,gf):
             ax=els[i].ax*gf
             by=els[i].by*gf
             cz=els[i].cz*gf
-            e0=Ellipsoid(ax,by,cz,els[i].dir,els[i].ang1,els[i].ang2,(len(els[i].spheres)-1)//2)
+            e0=Ellipsoid(ax,by,cz,els[i].dir,els[i].ang1,els[i].ang2,len(els[i].spheres))
             e0.pos=els[i].pos
             inter=False
             for j in range(len(els)):
