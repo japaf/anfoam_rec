@@ -1,0 +1,21 @@
+{"output-file": "results/exp_wetfoam/foam_sphere",
+"generate": {
+    "MUR": 0.16,
+    "SIGMAR": 0.02,
+    "SIGMAA": 0,
+    "spheres-per-ellipsoid": 1,
+    "num-cells": -1,
+    "packing-alg": "densesp"
+},
+"relax": {
+	"porosity": 0.95,
+    "strut-content": 0.5
+},
+"analyze": {
+	"bins-cell": 20,
+	"bins-edge": 20,
+	"spheres-per-ellipsoid": 1
+}}
+
+
+

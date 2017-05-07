@@ -36,6 +36,48 @@ an_dry_json:= {
 		faces_area[ff.fmark] += ff.area;
 	  };
 	  printf ",\n";
+	  printf "\"angles\": ";
+	  printf "[";
+	  vvfirst:=1;
+	  anglefirst:=1;
+	  foreach vertex vv do {
+		if sum(vv.edge eee,eee.emark>0)==4 then {
+			if vvfirst==1 then {
+				printf "[";
+			} else {
+				printf ",[";
+			};
+			vvfirst:=0;
+			anglefirst:=1;
+			foreach vv.edge ee0 where emark>0 do {
+			foreach vv.edge ee1 where emark>0 and id>ee0.id do {
+			if ee0.id!=ee1.id then {
+			dir0:=1;
+			dir1:=1;
+			if ee0.vertices[1].id!=vv.id then
+				dir0:=dir0*-1;
+			if ee1.vertices[1].id!=vv.id then
+				dir1:=dir1*-1;
+			norm0:=sqrt(ee0.x**2+ee0.y**2+ee0.z**2);
+			norm1:=sqrt(ee1.x**2+ee1.y**2+ee1.z**2);
+			cosa:=dir0*ee0.edge_vector*dir1*ee1.edge_vector/norm0/norm1;
+			tetrahedral_angle:=acos(cosa)*180/pi;
+			if anglefirst==1 then {
+				printf "%f",tetrahedral_angle;
+			}else{
+				printf ",%f",tetrahedral_angle;
+			};
+			anglefirst:=0;
+			};
+			};
+			};
+			printf "]";
+		}
+	  };
+	  printf "]";
+	  printf ",\n";
+	  
+	  //cell descriptors
 	  printf "\"cells\": [";
 	  first_cell_output:=1;
 	  foreach body bb do{

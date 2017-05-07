@@ -1,0 +1,24 @@
+{"output-file": "results/exp_dispell6/foam_dispell",
+"generate": {
+    "MUX": 0.162,
+    "MUYZ": 0.09,
+	"MUA": 0.0,
+    "SIGMAX": 0.02,
+    "SIGMAA": 0,
+    "spheres-per-ellipsoid": 9,
+    "num-cells": -1,
+    "packing-alg": "elrand",
+    "grow-alg": "True"
+},
+"relax": {
+	"porosity": 0.95,
+    "strut-content": 0.6
+},
+"analyze": {
+	"bins-cell": 12,
+	"bins-edge": 50,
+	"spheres-per-ellipsoid": 9
+}}
+
+
+

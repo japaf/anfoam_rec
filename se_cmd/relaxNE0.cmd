@@ -5,7 +5,8 @@ For example:
 	read "../se_cmd/foamface.cmd"
 
 To relax foam
-usage: relax
+usage: relax_dry
+		relax_wet
 */
 str := {
 	set vertex x 1.05*x where x>0.5;
@@ -39,21 +40,17 @@ g;u;w 1e-8;g;
 
 relax_nopop:={
 //pop_tri_to_edge facets;
-N;
 V;
 {g 10;u 2;g 10}5;
 }
 
 relax_pop_tri:={
-N;
-V;
 pop_tri_to_edge facets;
 V;
-{g 10;u 2;g 10}5;
+{g 10;u 2;g 20}5;
 }
 
 relax_pop_and_weed:={
-N;
 V;
 pop_tri_to_edge facets;
 {g 10;u 2;w 1e-7;g 10}5;
@@ -61,34 +58,71 @@ pop_tri_to_edge facets;
 
 relax_pop_quad:={
 V;
-N;
 pop_quad_to_quad facets;
 {g 10;u 2;g 10}5;
 }
 
-procedure relax_pop_tri_smallarea(real minarea) {
-N;
-V;
-{foreach facet ff where area<minarea do pop_tri_to_edge ff;g 10;u 2;g 10}5;
+procedure pop_tri_edge(real minval) {
+pop_tri_to_edge facets where area<minval;
 }
 
-relax_minarea:={
-relax_pop_tri_smallarea(1e-8);
-relax_pop_tri_smallarea(1e-7);
-relax_pop_tri_smallarea(1e-6);
-relax_pop_tri_smallarea(1e-5);
-relax_pop_tri_smallarea(1e-4);
-relax_pop_tri_smallarea(1e-3);
+procedure pop_quad_quad(real minval) {
+pop_quad_to_quad facets where area<minval;
+}
+procedure pop_edge_tri(real minval) {
+pop_edge_to_tri edges where length<minval;
+}
+
+procedure pop_edges(real minval)
+{
+t minval;
+O;o;u 5;g 5;
+//w minval;
+//O;o;u 5;g 5;
 }
 
 // command is called for foam relaxing
 
-relax_dry:={
-relax_pop_tri;
+pop_minimal_edges:= {
+ehist;
+pop_edge_to_tri edges where color=red
 }
 
+set_target_vol:= {
+	foreach body bb do {
+	set bb.target volume;
+	};
+}
+
+procedure pop_nonminimal(real minval)
+{
+pop_edges(minval);
+pop_edge_tri(minval);
+pop_quad_quad(minval/10);
+pop_tri_to_edge facets;
+u 10;
+}
+
+procedure pop_in_cascade(real minval)
+{
+pop_nonminimal(minval);
+pop_nonminimal(minval*1e1);
+pop_nonminimal(minval*1e2);
+pop_nonminimal(minval*1e3);
+pop_nonminimal(minval*1e4);
+}
+
+relax_dry:={
+set_target_vol;
+V;
+{pop_in_cascade(1e-9);u 10;g 50} 10;
+g 20;
+dump "foam_dmp.fe";
+}
+// 
+
 relax_wet:={
-g 50;u;{{u;g 20}}3;
+g 100;u;{{u;g 20}}3;
 }
 
 define facet attribute removeface integer

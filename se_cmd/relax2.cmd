@@ -5,7 +5,8 @@ For example:
 	read "../se_cmd/foamface.cmd"
 
 To relax foam
-usage: relax
+usage: relax_dry
+		relax_wet
 */
 str := {
 	set vertex x 1.05*x where x>0.5;
@@ -49,7 +50,7 @@ N;
 V;
 pop_tri_to_edge facets;
 V;
-{g 10;u 2;g 10}5;
+{g 10;u 2;g 20}5;
 }
 
 relax_pop_and_weed:={
@@ -69,8 +70,21 @@ pop_quad_to_quad facets;
 procedure relax_pop_tri_smallarea(real minarea) {
 N;
 V;
-{foreach facet ff where area<minarea do pop_tri_to_edge ff;g 10;u 2;g 10}5;
+{foreach facet ff where area<minarea do pop_tri_to_edge ff;g 10;u 2;g 20}5;
 }
+
+procedure relax_quad_quad_smallarea(real minarea) {
+N;
+V;
+{foreach facet ff where area<minarea do pop_quad_to_quad ff;g 10;u 2;g 20}5;
+}
+
+procedure relax_pop_small_edge(real minlength) {
+N;
+V;
+{foreach edge ee where length<minlength do pop_edge_to_tri ee;g 10;u 2;g 20}5;
+}
+
 
 relax_minarea:={
 relax_pop_tri_smallarea(1e-8);
@@ -82,13 +96,19 @@ relax_pop_tri_smallarea(1e-3);
 }
 
 // command is called for foam relaxing
+procedure relax_minval(real minval) {
+relax_pop_tri_smallarea(minval);
+relax_pop_small_edge(minval);
+}
 
 relax_dry:={
-relax_pop_tri;
+relax_pop_small_edge(1e-8);
+relax_pop_small_edge(1e-7);
+relax_pop_small_edge(1e-6);
 }
 
 relax_wet:={
-g 50;u;{{u;g 20}}3;
+g 100;u;{{u;g 20}}3;
 }
 
 define facet attribute removeface integer

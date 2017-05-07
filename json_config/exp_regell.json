@@ -1,0 +1,27 @@
+{"output-file": "results/exp_regell/foam_regell1_3",
+"generate": {
+    "MUX": 0.13,
+    "MUY": 0.1,
+    "MUZ": 0.1,
+	"MUA": 0.0,
+    "SIGMAX": 0.00,
+    "SIGMAY": 0.00,
+    "SIGMAZ": 0.00,
+    "SIGMAA": 0,
+    "spheres-per-ellipsoid": 9,
+    "num-cells": -1,
+    "packing-alg": "elrand",
+    "grow-alg": "True"
+},
+"relax": {
+	"porosity": 0.96,
+    "strut-content": 0.4
+},
+"analyze": {
+	"bins-cell": 12,
+	"bins-edge": 50,
+	"spheres-per-ellipsoid": 9
+}}
+
+
+

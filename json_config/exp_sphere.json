@@ -1,0 +1,27 @@
+{"output-file": "results/exp_sphere/foam_sphere",
+"generate": {
+    "MUX": 0.15,
+    "MUY": 0.15,
+    "MUZ": 0.15,
+	"MUA": 0.0,
+    "SIGMAX": 0.075,
+    "SIGMAY": 0.075,
+    "SIGMAZ": 0.075,
+    "SIGMAA": 0,
+    "spheres-per-ellipsoid": 1,
+    "num-cells": -1,
+    "packing-alg": "elrand",
+    "grow-alg": "True"
+},
+"relax": {
+	"porosity": 0.96,
+    "strut-content": 0.4
+},
+"analyze": {
+	"bins-cell": 12,
+	"bins-edge": 50,
+	"spheres-per-ellipsoid": 1
+}}
+
+
+
