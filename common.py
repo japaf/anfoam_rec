@@ -39,3 +39,6 @@ def find_files(directory,pattern_path):
         if fnmatch.fnmatch(file_path,pattern_path):
             matches.append(file_path)
     return matches
+
+def getparrentdir(path):
+    return path[:-len(path.split('/')[-1])]

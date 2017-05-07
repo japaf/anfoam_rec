@@ -31,7 +31,7 @@ def main():
         config=json.load(stream)
     output_file = config['output-file']
     file_name=output_file.split('/')[-1]
-    parent_directory_path=output_file[:-len(file_name)]
+    parent_directory_path=common.getparrentdir(output_file)
     common.create_parent_directory(parent_directory_path)
 
     if args.generate:
@@ -43,6 +43,12 @@ def main():
         relax_files = foam_relax.init_file_option(output_file+'_relaxed')
         relax_config.update(relax_files)
         foam_relax.relax(output_file+'.fe',relax_config)
+    if args.relax_strut:
+        relax_config = config['relax']
+        relax_files = foam_relax.init_file_option(output_file + '_relaxed')
+        relax_config.update(relax_files)
+        foam_relax.relax_dry_foam(output_file + '.fe', relax_config)
+        foam_relax.optimize_strut_content(relax_config['relaxed-dry'], relax_config)
     if args.analyze:
         analyze_config = config['analyze']
         if args.recursive:
@@ -50,7 +56,9 @@ def main():
         else:
             json_files=common.find_files(parent_directory_path,output_file+'*.json')
         for json_file in json_files:
-            foam_analyze.analyze(json_file,'auto',analyze_config)
+            logging.info('Analyzing file:')
+            print(json_file)
+            foam_analyze.analyze_and_plot(json_file,'auto',analyze_config)
 
 
 if __name__ == '__main__':
@@ -60,7 +68,10 @@ if __name__ == '__main__':
                         help="Generate foam according to settings in config file")
     parser.add_argument("-r", "--relax",
                         action='store_true',
-                        help="Relax foam according to settings in config file")
+                        help="Relax foam, optimize strut content and porosity according to settings in config file [output stl,vox]")
+    parser.add_argument("-s", "--relax-strut",
+                        action='store_true',
+                        help="Relax foam and optimize strut concent, according to settings in config file [output: stl]")
     parser.add_argument("-a", "--analyze",
                         action='store_true',
                         help="Analyze foam according to settings in config file")

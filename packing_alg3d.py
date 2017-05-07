@@ -35,7 +35,7 @@ class Ellipsoid:
         self.spheres=[]
         if n%2==1:
             self.spheres.append(Sphere(self.by,self.pos))
-        self.aproxBySpheres((int)(n/2))
+        self.aproxBySpheres((int)(n//2))
     def aproxBySpheres(self,n):
         #aprox the ellipsoid by 2n+1 spheres
         if n>0:
@@ -104,8 +104,7 @@ class GeneratorEllipsoid():
     def getEl(self):
         ax = abs(np.random.normal(self.MUX, self.SX))
         by = abs(np.random.normal(self.MUY, self.SY))
-        #cz = abs(np.random.normal(self.MUZ, self.SZ))
-        cz = by #####
+        cz = abs(np.random.normal(self.MUZ, self.SZ))
         alfa = abs(np.random.normal(self.MUA, self.SA))
         beta = abs(np.random.normal(self.MUA, self.SA))
         cosa = math.cos(alfa)
@@ -114,6 +113,137 @@ class GeneratorEllipsoid():
         sinb = math.sin(beta)
         rot= np.array([cosb*cosa,cosb*sina,sinb])
         return Ellipsoid(ax,by,cz,rot,alfa,beta,self.n)
+    def getEl_proporcional(self):
+        ax = abs(np.random.normal(self.MUX, self.SX))
+        axmuxproportion=ax/self.MUX
+        by = self.MUY*axmuxproportion
+        cz = by
+        alfa = abs(np.random.normal(self.MUA, self.SA))
+        beta = abs(np.random.normal(self.MUA, self.SA))
+        cosa = math.cos(alfa)
+        sina = math.sin(alfa)
+        cosb = math.cos(beta)
+        sinb = math.sin(beta)
+        rot = np.array([cosb * cosa, cosb * sina, sinb])
+        return Ellipsoid(ax, by, cz, rot, alfa, beta, self.n)
+
+"""
+Ellipsoid packing algorithm - Random sequential adsorption (RSA)
+"""
+def _randEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el,num_cell):
+    '''
+    :param MUX:
+    :param MUY:
+    :param MUA:
+    :param SX:
+    :param SY:
+    :param SA:
+    :param xmax:
+    :param ymax:
+    :return:
+    '''
+    xmax= ymax= zmax =1.0
+    if num_cell==-1: #generate all
+        num_cell=1e9
+    els=[]
+    random.seed()
+    ge=GeneratorEllipsoid(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el)
+    j = 0
+    els_vol = 0
+    timeout = time.time() + 5
+    while j<num_cell:
+        if time.time()>timeout:
+            break
+        e0 = ge.getEl_proporcional() #consistent also for one sphere per ellipsoids= sphere packing
+        for i in range(50):
+            e0.pos = np.array([xmax * random.random(), ymax * random.random(), zmax * random.random()])
+            inter=False
+            for el in els:
+                if (e0.testFastInter(el)):
+                    if (e0.testSphereInter(el)):
+                        inter = True
+                        break
+            if not inter:
+                els.append(e0)
+                els_vol += 4 / 3 * np.pi * e0.ax * e0.by * e0.cz
+                j+=1
+                break
+    #mayavi_visu.show_els(els)
+    return els,els_vol
+
+def randEllipsoidPack(MUX,MUYZ,MUA,SX,SA,sp_per_el,num_cell):
+    els,els_vol=_randEllipsoidPack(MUX, MUYZ, MUYZ, MUA, SX, SX, SX, SA, sp_per_el, num_cell)
+    log.info('Volume fraction: %.3f Number of ellipsoids: %d', els_vol, len(els))
+    return els
+
+
+"""
+Sphere packing algorithm - Random sequential adsorption (RSA)
+"""
+def randSpherePack(MUR,SR,num_cells):
+    '''
+
+    :param MUR: average radius
+    :param SR: deviation of radius
+    :param xmax: x size of the box
+    :param ymax: y size of the box
+    :param zmax: z size of the box
+    :param nSpheres: number of spheres
+    :return:
+    '''
+    els, els_vol = _randEllipsoidPack(MUR, MUR, MUR, 0, SR, SR, SR, 0, 1, num_cells)
+    log.info('Volume fraction: %.3f Number of spheres: %d', els_vol, len(els))
+    return els
+
+def sphereVol(sps):
+    vol=0
+    for sp in sps:
+        vol += 4 / 3 * np.pi * sp.r ** 3
+    return vol
+
+def ellipsoidVol(els):
+    vol=0
+    for el in els:
+        vol+=4 / 3 * np.pi * el.ax * el.by * el.cz
+    return vol
+
+def _ellipsoidGrow(els,gf):
+    timeout = time.time() + 5
+    while True:
+        if time.time()>timeout:
+            break
+        for i in range(len(els)):
+            ax=els[i].ax*gf
+            by=els[i].by*gf
+            cz=els[i].cz*gf
+            e0=Ellipsoid(ax,by,cz,els[i].dir,els[i].ang1,els[i].ang2,len(els[i].spheres))
+            e0.pos=els[i].pos
+            inter=False
+            for j in range(len(els)):
+                if ( i != j ):
+                    if (e0.testFastInter(els[j])):
+                        if (e0.testSphereInter(els[j])):
+                            inter = True
+                            break
+            if not inter:
+                els[i]=e0
+    print(ellipsoidVol(els))
+    #mayavi_visu.show_els(els)
+    return els
+
+def sphereGrow(els,gf):
+    log.info('Increasing radius of spheres...')
+    els=_ellipsoidGrow(els, gf)
+    return els
+
+def ellipsoidGrow(els,gf):
+    log.info('Increasing radius of ellipsoids...')
+    els = _ellipsoidGrow(els, gf)
+    return els
+
+'''
+Not implemetned
+'''
 
 def approxEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,xmax,ymax,zmax,nCirc):
     '''
@@ -173,147 +303,5 @@ def approxEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,xmax,ymax,zmax,nCirc):
             y+=MUY*1.5
             print("Ellipsoids placed: ",len(els))
         z+=MUZ*1.5
-    #mayavi_visu.show_els(els)
-    return els
-
-"""
-Ellipsoid packing algorithm - Random sequential adsorption (RSA)
-"""
-def randEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el,num_cell):
-    '''
-    :param MUX:
-    :param MUY:
-    :param MUA:
-    :param SX:
-    :param SY:
-    :param SA:
-    :param xmax:
-    :param ymax:
-    :return:
-    '''
-    xmax= ymax= zmax =1.0
-    if num_cell==-1: #generate all
-        num_cell=1e9
-    els=[]
-    random.seed()
-    ge=GeneratorEllipsoid(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el)
-    j = 0
-    els_vol = 0
-    timeout = time.time() + 5
-    while j<num_cell:
-        if time.time()>timeout:
-            break
-        e0 = ge.getEl()
-        inter = False
-        e0.pos = np.array([xmax * random.random(), ymax * random.random(), zmax * random.random()])
-        inter=False
-        for el in els:
-            if (e0.testFastInter(el)):
-                if (e0.testSphereInter(el)):
-                    inter = True
-                    break
-        if not inter:
-            els.append(e0)
-            els_vol += 4 / 3 * np.pi * e0.ax * e0.by * e0.cz
-            j+=1
-    log.info('Volume fraction: %.3f Number of ellipsoids: %d', els_vol, len(els))
-    #mayavi_visu.show_els(els)
-    return els
-
-
-"""
-Sphere packing algorithm - Random sequential adsorption (RSA)
-"""
-def randSpherePack(MUR,SR,xmax,ymax,zmax,nSpheres,sat):
-    '''
-
-    :param MUR: average radius
-    :param SR: deviation of radius
-    :param xmax: x size of the box
-    :param ymax: y size of the box
-    :param zmax: z size of the box
-    :param nSpheres: number of spheres
-    :return:
-    '''
-    log.info('Generating sphere packing...')
-    sps = [] #spheres
-    random.seed()
-    rad=abs((np.random.normal(MUR,SR,nSpheres)))
-    j=0
-    sphere_vol = 0
-    timeout = time.time() + 5
-    while j<=nSpheres or sat:
-        if time.time()>timeout:
-            log.warning('TIMEOUT: Can not place all spheres. Placed: %d',j)
-            break
-        pos0=np.array([xmax*random.random(),ymax*random.random(),zmax*random.random()])
-        inter=False
-        for sp in sps:
-            if (getDist(pos0,sp.relpos)<(rad[j]+sp.r)):
-                inter=True
-                break
-        if not inter:
-            sps.append(Sphere(rad[j],pos0))
-            sphere_vol += 4 / 3 * np.pi * rad[j] ** 3
-            j+=1
-    #EdgeCubeSize=[math.ceil(MAXcenters[0]-Mincenters[0]),math.ceil(MAXcenters[1]-Mincenters[1]),math.ceil(MAXcenters[2]-Mincenters[2])]
-    #EdgeRVESize=int(3.0*max(EdgeCubeSize)) #For NEPER: Size of edge of RVE
-    print('Volume fraction: ',sphere_vol,'\tNumber of spheres: ',len(sps))
-    #mayavi_visu.show_sps(sps)
-    return sps
-
-def sphereVol(sps):
-    vol=0
-    for sp in sps:
-        vol += 4 / 3 * np.pi * sp.r ** 3
-    return vol
-
-def ellipsoidVol(els):
-    vol=0
-    for el in els:
-        vol+=4 / 3 * np.pi * el.ax * el.by * el.cz
-    return vol
-
-def sphereGrow(sps,gf):
-    log.info('Increasing radius of spheres...')
-    timeout = time.time() + 5
-    while True:
-        if time.time()>timeout:
-            break
-        for i in range(len(sps)):
-            r0=sps[i].r*gf
-            inter=False
-            for j in range(len(sps)):
-                if ( i != j ) and (getDist(sps[i].relpos, sps[j].relpos) < (r0 + sps[j].r)):
-                    inter = True
-                    break
-            if not inter:
-                sps[i].r=r0
-    print(sphereVol(sps))
-    #mayavi_visu.show_sps(sps)
-    return sps
-
-def ellipsoidGrow(els,gf):
-    log.info('Increasing radius of ellipsoids...')
-    timeout = time.time() + 5
-    while True:
-        if time.time()>timeout:
-            break
-        for i in range(len(els)):
-            ax=els[i].ax*gf
-            by=els[i].by*gf
-            cz=els[i].cz*gf
-            e0=Ellipsoid(ax,by,cz,els[i].dir,els[i].ang1,els[i].ang2,len(els[i].spheres))
-            e0.pos=els[i].pos
-            inter=False
-            for j in range(len(els)):
-                if ( i != j ):
-                    if (e0.testFastInter(els[j])):
-                        if (e0.testSphereInter(els[j])):
-                            inter = True
-                            break
-            if not inter:
-                els[i]=e0
-    print(ellipsoidVol(els))
     #mayavi_visu.show_els(els)
     return els

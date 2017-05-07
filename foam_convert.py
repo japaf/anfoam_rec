@@ -7,6 +7,7 @@ import os
 import argparse
 import json
 import common
+import time
 from scipy.optimize import minimize_scalar as minimize_scalar
 #local
 import lib.periodicBox
@@ -54,85 +55,67 @@ def geo2fe(file_name, output_file, nvolpercell):
         ['se_api',
          '-i',file_name,
          '-o',output_file,
-        '--all-union', nvolpercell.__str__()])
+        '--all-union', nvolpercell.__str__()],stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
     thread.wait()
-    logging.info('Executing se_api ... done')
-    return output_file
-
-def dry2wet(fe_dry,fe_wet,geo_out,spread):
-    tmpcmd='tmp.cmd'
-    with open(tmpcmd,'w') as cmd_stream:
-        cmd_stream.write('read "se_cmd/foamface.cmd"\n')
-        cmd_stream.write('read "se_cmd/wetfoam2.cmd"\n')
-        cmd_stream.write('read "se_cmd/fe2geo.cmd"\n')
-        cmd_stream.write('read "se_cmd/an_foam.cmd"\n')
-        cmd_stream.write('read "se_cmd/relax.cmd"\n')
-        cmd_stream.write('connected\n')
-        if geo_out is not None:
-            cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(geo_out[:-4] + 'before.dry.json'))
-        cmd_stream.write('relax\n')
-        cmd_stream.write('spread:= {0:f}\n'.format(spread))
-        cmd_stream.write('wetfoam >>> "{0:s}"\n'.format(fe_wet))
-        if geo_out is not None:
-            cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(geo_out[:-4] + 'after.dry.json'))
-        cmd_stream.write('detorus\n')
-        if geo_out is not None:
-            cmd_stream.write(' geo >>> "{0:s}"\n'.format(geo_out))
-        cmd_stream.write('q\n')
-        cmd_stream.write('q\n')
-    execute_evolver(fe_dry,tmpcmd)
-    #os.remove(tmpcmd)
-
-def wet2stlgeo(fe_wet,geo_out,stl_out,iter):
-    tmp_cmd = 'tmp.cmd'
-    foam_stat='foam_stat.json'
-    with open(tmp_cmd, 'w') as cmd_stream:
-        cmd_stream.write('read "se_cmd/foamface.cmd"\n')
-        cmd_stream.write('read "se_cmd/fe2stl.cmd"\n')
-        cmd_stream.write('read "se_cmd/fe2geo.cmd"\n')
-        cmd_stream.write('read "se_cmd/an_foam.cmd"\n')
-        cmd_stream.write('read "se_cmd/strut_content.cmd"\n')
-        cmd_stream.write('connected\n')
-        cmd_stream.write('g 10;u;r;{{u;g 10}}{0:d}\n'.format(iter))
-        cmd_stream.write('print_stat >>> "{0:s}"\n'.format(foam_stat))
-        if geo_out is not None:
-            cmd_stream.write(' an_wet_json >>> "{0:s}"\n'.format(geo_out[:-4] + '.wet.json'))
-        cmd_stream.write('detorus\n')
-        if geo_out is not None:
-            cmd_stream.write(' geo >>> "{0:s}"\n'.format(geo_out))
-        if stl_out is not None:
-            cmd_stream.write(' stl >>> "{0:s}"\n'.format(stl_out))
-        cmd_stream.write('q\n')
-        cmd_stream.write('q\n')
-    execute_evolver(fe_wet, tmp_cmd)
-    strut_volume=0.0
-    with open(foam_stat,'r') as stream:
-        stat=json.load(stream)
-        strut_volume=stat['volume']
-    os.remove(tmp_cmd)
-    os.remove(foam_stat)
-    return strut_volume
-
+    if not os.path.isfile(output_file+'.fe'):
+        return False
+    return True
 '''
     Execution program
 '''
-
+def test_evolver(fe_file):
+    tmp_cmd = 'tmp_' + time.time().__str__() + '.cmd'
+    with open(tmp_cmd, 'w') as cmd_stream:
+        cmd_stream.write('q\n')
+        cmd_stream.write('q\n')
+    report=execute_evolver_test(fe_file,tmp_cmd)
+    os.remove(tmp_cmd)
+    success=False
+    if report['errors']==0 and report ['warnings']==0:
+        success=True
+    return success
 
 def execute_evolver(fe_file,cmd_file):
     thread = subprocess.Popen(
         ['evolver',
+         '-x', # exit if an error occur
          '-f', cmd_file,
-         fe_file],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+         fe_file],stderr=subprocess.PIPE,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
     thread.wait()
     warning_count=0
     error_count=0
     for line in thread.stderr:
-        if "WARNING" in line.__str__():
+        print(line)
+        if "WARNING" in line.__str__() or "warning" in line.__str__():
             warning_count+=1
-        if "ERROR" in line.__str__():
+        elif "ERROR" in line.__str__() or "error" in line.__str__():
+            print(line)
             error_count+=1
     if warning_count>0 or error_count>0:
         logging.error("Surface evolver reported %d warnings and %d errors.",warning_count,error_count)
+    if error_count>0:
+        return False
+    return True
+
+def execute_evolver_test(fe_file,cmd_file):
+    thread = subprocess.Popen(
+        ['evolver',
+         '-x', # exit if an error occur
+         '-f', cmd_file,
+         fe_file],stderr=subprocess.PIPE,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
+    thread.wait()
+    warning_count=0
+    error_count=0
+    for line in thread.stderr:
+        print(line)
+        if "WARNING" in line.__str__() or "warning" in line.__str__():
+            warning_count+=1
+        elif "ERROR" in line.__str__() or "error" in line.__str__():
+            print(line)
+            error_count+=1
+    if warning_count>0 or error_count>0:
+        logging.error("Surface evolver reported %d warnings and %d errors.",warning_count,error_count)
+    return {'errors':error_count,'warnings':warning_count}
 
 def execute_binvox(ply_file,resolution):
     thread = subprocess.Popen(
@@ -146,20 +129,25 @@ def execute_binvox(ply_file,resolution):
             numbers = [int(s) for s in line.__str__()[:-3].split() if s.isdigit()]
         if "VoxelFile::write_file" in line.__str__():
             vtk_file = line.__str__()[:-4].split('(')[-1]
-    [foam_porosity,vtk_out]=execute_vox_fill(vtk_file,vtk_file)
+    radius=int(2*resolution//100)
+    [foam_porosity,vtk_out]=execute_vox_fill(vtk_file,vtk_file,radius,radius//4)
     return [foam_porosity,vtk_out]
 
-def execute_vox_fill(vtk_in,vtk_out):
+def execute_vox_fill(vtk_in,vtk_out,radius,step):
     # fill holes in structure
     thread = subprocess.Popen(
         ['vox_fill',
          '-i', vtk_in,
          '-o', vtk_out,
-         '--radius', '5',
-         '--step','5'], stdout=subprocess.PIPE)
+         '--radius', str(radius),
+         '--step',str(step)], stdout=subprocess.PIPE)
     thread.wait()
     foam_porosity=0.0
+    found_cells=0
     for line in thread.stdout:
+        if "Found" in line.__str__():
+            found_cells=int(line.__str__().split()[-2])
+            print("Found cells: ",found_cells)
         if "Foam porosity" in line.__str__():
             foam_porosity = float(line.__str__()[:-4].split()[-1])
     return [foam_porosity,vtk_out]

@@ -30,7 +30,7 @@ def main():
 
     if args.grow_alg:
         configuration['grow-alg']=args.grow_alg
-    generate_3d_neper(output_file, configuration)
+    #generate_3d_neper(output_file, configuration)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
