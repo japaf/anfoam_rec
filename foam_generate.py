@@ -45,7 +45,7 @@ def generate_3d_neper(output_file,opt):
     elif opt['packing-alg']=='sprand':
         logging.info('Generating sphere packing (RSP)...')
         ellipsoids = packing_alg3d.randSpherePack(MUR,SR,num_cells)
-        if opt['grow-alg']:
+        if 'grow-alg'in opt and opt['grow-alg']:
             ellipsoids = packing_alg3d.sphereGrow(ellipsoids, 1.05)
     #elif opt['packing-alg'] == 'elseqdrop':
     #    ellipsoids=packing_seq_drop.denseEllipsoidPack(MUX, MUY, MUZ, MUA, SX, SY, SZ, SA, sp_per_el, num_cells)

@@ -58,14 +58,18 @@ def dense_sphere_pack(MUR,SR):
     conf_file='generation.conf'
     info_file='packing.nfo'
     output_data='packing.xyzd'
+    #clean files
+    for filef in [diameters_file,conf_file,info_file,output_data]:
+        if os.path.isfile(filef):
+            os.remove(filef)
     n_particles=0
     with open(diameters_file,'w') as stream:
         for i in range(1000):
             radius=abs(np.random.normal(MUR, SR))
             volume+=4.0 / 3 * (radius) ** 3 * np.pi
-            stream.write("{0:f}".format(2*radius))
+            stream.write("{0:f}\n".format(2*radius))
             n_particles+=1
-            if volume>0.65:
+            if volume>0.7:
                 break
     print (volume,n_particles)
 

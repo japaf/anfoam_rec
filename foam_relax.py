@@ -140,7 +140,7 @@ def newton_method_strut_cont(fe_dry,opt):
     th=1e-5
     res0 = obj_fn_strut(fe_dry, tmp_wet, None, None, x - dx, opt) - target_strut_volume
     print("Strut content\tError\tSpread parameter")
-    for i in range(10):
+    for i in range(15):
         strut_volume = obj_fn_strut(fe_dry, tmp_wet, None, None, x,opt)
         res1 = strut_volume - target_strut_volume
         df = (res1 - res0) / dx
@@ -168,13 +168,13 @@ def obj_fn_strut(fe_dry,fe_wet,analysis_file,stl,spread,opt):
     return relaxwetfoam_savestlandgeo(fe_wet, analysis_file, stl,opt['relax-cmd'])
 
 def newton_method_por(ply_file,target_por):
-    x=250
+    x=200
     minx=50
-    maxx=600
+    maxx=1500
     dx=50
     res0 = obj_fn_por(ply_file, x - dx) - target_por
     print("Porosity\tError\tResolution")
-    for i in range(10):
+    for i in range(30):
         por=obj_fn_por(ply_file, x)
         res1 = por - target_por
         df=(res1-res0)/dx

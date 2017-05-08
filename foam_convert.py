@@ -129,12 +129,16 @@ def execute_binvox(ply_file,resolution):
             numbers = [int(s) for s in line.__str__()[:-3].split() if s.isdigit()]
         if "VoxelFile::write_file" in line.__str__():
             vtk_file = line.__str__()[:-4].split('(')[-1]
-    radius=int(2*resolution//100)
+    radius=int(3*resolution//100)
     [foam_porosity,vtk_out]=execute_vox_fill(vtk_file,vtk_file,radius,radius//4)
     return [foam_porosity,vtk_out]
 
 def execute_vox_fill(vtk_in,vtk_out,radius,step):
     # fill holes in structure
+    if step<1:
+        step=1
+    if radius<1:
+        radius=1
     thread = subprocess.Popen(
         ['vox_fill',
          '-i', vtk_in,
