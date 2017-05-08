@@ -16,10 +16,10 @@ import foam_relax
 __author__ = 'jiri1kolar'
 __email__ = "jiri1kolar@gmail.com"
 
-#por_range = [0.92,0.93,0.94,0.95,0.96,0.97]
-#strut_range = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-por_range=[0.92,0.93]
-strut_range=[0.3]
+por_range = [0.92,0.93,0.94,0.95,0.96,0.97]
+strut_range = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+#por_range=[0.92,0.93]
+#strut_range=[0.3]
 
 def main():
     common.init_logging()
