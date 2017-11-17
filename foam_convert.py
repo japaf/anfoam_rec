@@ -55,7 +55,7 @@ def geo2fe(file_name, output_file, nvolpercell):
         ['se_api',
          '-i',file_name,
          '-o',output_file,
-        '--all-union', nvolpercell.__str__()],stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
+        '--all-union', nvolpercell.__str__()])#,stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
     thread.wait()
     if not os.path.isfile(output_file+'.fe'):
         return False
