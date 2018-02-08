@@ -1,4 +1,4 @@
-{"output-file": "results/example_dispell/foam_dispell_test",
+{"output-file": "results/example_el1/foam_el1",
 "generate": {
     "MUX": 0.15,
     "MUYZ": 0.1,
