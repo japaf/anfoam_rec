@@ -9,18 +9,38 @@ Lubachevsky-Stillinger algorithm and The Force-Biased Algorithm
 import struct
 import numpy as np
 import subprocess
-import packing_alg3d
 import logging
 import os
 import argparse
+import common
+import packing_alg3d
 
+def execute_externalPackingGenerator(conf_file,opt):
+    write_config_file(conf_file, opt)
+    logging.info("Executing PackingGeneration.exe ...")
+    successful_generation = _execute_externalPackingGenerator('-fba')
+    if successful_generation:
+        opt['gen-start'] = 0
+        write_config_file(conf_file, opt)
+        successful_generation = _execute_externalPackingGenerator('-ls')
+    return successful_generation
 
-def execute_externalPackingGenerator(mode):
+def _execute_externalPackingGenerator(mode):
+    warning_count=0
     thread = subprocess.Popen(
         ['PackingGeneration.exe',
          mode,  # exit if an error occur
-         ])  # stderr=subprocess.PIPE stdout=subprocess.DEVNULL
+         ],stderr=subprocess.PIPE,stdout=subprocess.PIPE)  # stderr=subprocess.PIPE stdout=subprocess.DEVNULL
+    for line in thread.stdout:
+        if "WARNING" in line.__str__() or "warning" in line.__str__():
+            #print(line)
+            warning_count+=1
+        if warning_count>5:
+            logging.error('Unsucessful run of external PackingGenerator, algorithm is not converging.')
+            thread.kill()
+            return False
     thread.wait()
+    return True
 
 
 def write_config_file(file_name, opt):
@@ -52,8 +72,8 @@ def load_scaling_factor(file_name):
 
 
 
-def dense_sphere_pack(MUR,SR):
-    volume=0
+def dense_sphere_pack(MUR,SR,n_particles):
+
     diameters_file='diameters.txt'
     conf_file='generation.conf'
     info_file='packing.nfo'
@@ -62,16 +82,23 @@ def dense_sphere_pack(MUR,SR):
     for filef in [diameters_file,conf_file,info_file,output_data]:
         if os.path.isfile(filef):
             os.remove(filef)
-    n_particles=0
+    if n_particles==-1:
+        n_particles=27
+    elif n_particles>74 and n_particles<400:
+        logging.warning('Number of cells may cause problems during generation, 3rd party software have some bugs in range of 75-400.')
+    volume = 0
+    radius_arr=[]
+    for i in range(n_particles):
+        radius=abs(np.random.normal(MUR, SR))
+        radius_arr.append(radius)
+        volume += 4.0 / 3 * (radius) ** 3 * np.pi
+    scaling=0.5/volume #make sure that radius wont be too big
+
     with open(diameters_file,'w') as stream:
-        for i in range(1000):
-            radius=abs(np.random.normal(MUR, SR))
-            volume+=4.0 / 3 * (radius) ** 3 * np.pi
-            stream.write("{0:f}\n".format(2*radius))
-            n_particles+=1
-            if volume>0.7:
-                break
-    print (volume,n_particles)
+        for i in range(n_particles):
+            stream.write("{0:f}\n".format(2*radius_arr[i]*np.power(scaling,1.0/3)))
+
+    logging.info ('Number of spheres: %d',n_particles)
 
     opt = {'particles-count': n_particles,
            'packing-size': [1, 1, 1],
@@ -81,29 +108,25 @@ def dense_sphere_pack(MUR,SR):
            'boundaries-mode': 1,
            'contraction-rate': 1e-3,
            'gen-mode': 1}
-    write_config_file(conf_file, opt)
-    execute_externalPackingGenerator('-fba')
-    opt['gen-start'] = 0
-    write_config_file(conf_file, opt)
-    execute_externalPackingGenerator('-ls')
-    scaling = load_scaling_factor(info_file)
-    print('Scaling::',scaling)
-    els=[]
-    els_vol = 0
-    with open(output_data, "rb") as f:
-        particles = []
-        byte = f.read(8)
-        while byte != b"":
-            pos = np.array([0.0, 0.0, 0.0, 0.0])
-            for i in range(4):
-                num = struct.unpack('<d', byte)
-                pos[i] = num[0]
-                byte = f.read(8)
-            pos[3] = scaling * pos[3]
-            els_vol += 4.0 / 3 * (pos[3] / 2) ** 3 * np.pi
-            radius=pos[3] / 2
-            el=packing_alg3d.Ellipsoid(radius,radius,radius,0,0,0,1)
-            el.pos=pos[:-1]
-            els.append(el)
-        logging.info('Volume fraction: %.3f Number of spheres: %d', els_vol, len(els))
+    successful_generation=execute_externalPackingGenerator(conf_file,opt)
+    els = None
+    if successful_generation:
+        scaling = load_scaling_factor(info_file)
+        els_vol = 0
+        els = []
+        with open(output_data, "rb") as f:
+            byte = f.read(8)
+            while byte != b"":
+                pos = np.array([0.0, 0.0, 0.0, 0.0])
+                for i in range(4):
+                    num = struct.unpack('<d', byte)
+                    pos[i] = num[0]
+                    byte = f.read(8)
+                pos[3] = scaling * pos[3]
+                els_vol += 4.0 / 3 * (pos[3] / 2) ** 3 * np.pi
+                radius=pos[3] / 2
+                el=packing_alg3d.Ellipsoid(radius,radius,radius,0,0,0,1)
+                el.pos=pos[:-1]
+                els.append(el)
+            logging.info('Final volume fraction: %.3f', els_vol)
     return els

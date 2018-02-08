@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 
 '''
-This script runs several random generation and annealing procedure, process and report results
+This script enables to repeatedly run random generation and annealing procedure, process and report results
+Create subdirectories 1,2,3...
+so for example
+"output-file": "results/example_sphere/foam_sphere_test"
+will result to files
+results/example_sphere/1/foam_sphere_test
+results/example_sphere/2/foam_sphere_test
+results/example_sphere/3/foam_sphere_test
 '''
 
 import json
@@ -27,7 +34,7 @@ def main():
     common.create_parent_directory(parent_directory_path)
     zeros = "000"
     logging.info("Testing: %s", parent_directory_path)
-    if args.generate or args.relax_strut or args.relax_porosity or args.relax:
+    if args.generate or args.relax_strut or args.relax_porosity or args.relax or args.diffusion:
         for i in range(args.nrepetition):
             current_dir = zeros[len(str(i + 1)):] + str(i + 1)
             logging.info("Run %s", current_dir)
@@ -36,23 +43,31 @@ def main():
             if args.generate:
                 generate_config = config['generate']
                 foam_generate.generate_3d_neper_and_fe(current_output_file, generate_config)
-            if args.relax_strut or args.relax_porosity or args.relax:
+            if args.relax_strut or args.relax_porosity or args.relax_dry or args.diffusion:
                 relax_config = config['relax']
-                relax_config['relax-cmd'] = args.relax_cmd_file
+                if args.relax_cmd_file!="":
+                    relax_config['relax-cmd'] = args.relax_cmd_file
                 relax_files = foam_relax.init_file_option(current_output_file + '_')
                 relax_config.update(relax_files)
-                if args.relax:
+                if args.relax_dry:
                     foam_relax.relax_dry_foam(current_output_file + '.fe', relax_config)
                 if args.relax_strut:
                     if not os.path.isfile(relax_config['relaxed-dry']):
                         foam_relax.relax_dry_foam(current_output_file + '.fe', relax_config)
                     foam_relax.optimize_strut_content(relax_config['relaxed-dry'], relax_config)
+                if args.diffusion:
+                    relax_config['convert-vtk-to-txt']=True
+                if args.const_res:
+                    relax_config['const-res'] = True
+                    relax_config['resolution'] = 362
                 if args.relax_porosity:
                     foam_relax.relax_porosity(relax_config)
+
 
     if args.analyze:
         # load results
         analyze_config = config['analyze']
+
         files = {}
         relax_cmd_file_name = args.relax_cmd_file.split('/')[-1][:-4]
         files['before-dry'] = common.find_files_recursively(parent_directory_path, '*before.dry.json')
@@ -60,6 +75,7 @@ def main():
         files['after-wet'] = common.find_files_recursively(parent_directory_path, '*.wet.json')
         for key in ['before-dry', 'after-dry', 'after-wet']:  #
             if len(files[key]) > 0:
+                analyze_config['n-repetition'] = len(files[key])
                 logging.info('Analyzis of %s json files...', key)
                 plot_results(files[key], analyze_config, parent_directory_path + relax_cmd_file_name + key)
             else:
@@ -73,11 +89,11 @@ def plot_results(json_files, analyze_config, output_file_name_generic):
     foam_analyze.plot_results(resultsToPlot, analyze_config)
     save_data_for_gnuplot(resultsToPlot,output_file_name_generic)
 
-def save_data_for_gnuplot(results,outpu_file_name):
+def save_data_for_gnuplot(results,output_file_name):
     keys=['cell-size','edgesperfacet','facetspercell','angles','edge-length']
     for key in keys:
         if key in results:
-            with open(outpu_file_name+"_"+key+".dat",'w') as stream:
+            with open(output_file_name+"_"+key+".dat",'w') as stream:
                 [hist, min_val, max_val, domain_values, range_values] = results[key]['hist']
                 for i in range(len(domain_values)):
                     stream.write("{0:f}, {1:f}\n".format(domain_values[i],range_values[i]))
@@ -88,7 +104,7 @@ def collect_results(json_files, analyze_config):
     for file in json_files:
         logging.info("Collecting file %s", file)
         results = foam_analyze.analyze(file, 'auto', analyze_config)
-        for key in ['cell-types', 'data-angles', 'data-cells', 'length-by-edges']:
+        for key in ['cell-types', 'data-angles', 'data-cells', 'length-by-edges','total-surface']:
             add_arr_todict(key, results, cres)
     return cres
 
@@ -103,23 +119,29 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config-file",
                         required=True,
-                        help="Json configuration file",
+                        help="Json configuration file for parametric study",
                         metavar='FILE',
                         type=str)
     parser.add_argument("-f", "--relax-cmd-file",
-                        required=True,
                         help="Relax cmd file for Surface Evolver with relax_dry, relax_wet procedure",
                         metavar='FILE',
+                        default="",
                         type=str)
     parser.add_argument("-g", "--generate",
                         action='store_true',
                         help="Generate foam according to settings in config file")
-    parser.add_argument("-r", "--relax",
+    parser.add_argument("-d", "--relax-dry",
                         action='store_true',
                         help="Relax only dry foam structure according to settings in config file")
     parser.add_argument("-p", "--relax-porosity",
                         action='store_true',
                         help="Optimize porosity according to settings in config file [output stl,vox]")
+    parser.add_argument("--const-res",
+                        action='store_true',
+                        help="With constant resolution [output stl,vox]")
+    parser.add_argument("--diffusion",
+                        action='store_true',
+                        help="Create suitable txt file for diffusion simulation")
     parser.add_argument("-s", "--relax-strut",
                         action='store_true',
                         help="Relax foam and optimize strut concent, according to settings in config file [output: stl]")

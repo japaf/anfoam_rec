@@ -51,6 +51,8 @@ def stl2vox(stl_file,resolution):
 
 def geo2fe(file_name, output_file, nvolpercell):
     logging.info('Executing se_api ...')
+    if os.path.isfile(output_file+'.fe'):
+        os.remove(output_file + '.fe')
     thread = subprocess.Popen(
         ['se_api',
          '-i',file_name,
@@ -58,6 +60,7 @@ def geo2fe(file_name, output_file, nvolpercell):
         '--all-union', nvolpercell.__str__()],stderr=subprocess.DEVNULL,stdout=subprocess.DEVNULL)
     thread.wait()
     if not os.path.isfile(output_file+'.fe'):
+        logging.error('se_api can not process the input file.')
         return False
     return True
 '''
@@ -85,7 +88,7 @@ def execute_evolver(fe_file,cmd_file):
     warning_count=0
     error_count=0
     for line in thread.stderr:
-        print(line)
+        #print(line)
         if "WARNING" in line.__str__() or "warning" in line.__str__():
             warning_count+=1
         elif "ERROR" in line.__str__() or "error" in line.__str__():
@@ -130,8 +133,8 @@ def execute_binvox(ply_file,resolution):
         if "VoxelFile::write_file" in line.__str__():
             vtk_file = line.__str__()[:-4].split('(')[-1]
     radius=int(3*resolution//100)
-    [foam_porosity,vtk_out]=execute_vox_fill(vtk_file,vtk_file,radius,radius//4)
-    return [foam_porosity,vtk_out]
+    [foam_porosity,vtk_out,found_cells]=execute_vox_fill(vtk_file,vtk_file,radius,radius//4)
+    return [foam_porosity,vtk_out,found_cells]
 
 def execute_vox_fill(vtk_in,vtk_out,radius,step):
     # fill holes in structure
@@ -151,10 +154,19 @@ def execute_vox_fill(vtk_in,vtk_out,radius,step):
     for line in thread.stdout:
         if "Found" in line.__str__():
             found_cells=int(line.__str__().split()[-2])
-            print("Found cells: ",found_cells)
         if "Foam porosity" in line.__str__():
             foam_porosity = float(line.__str__()[:-4].split()[-1])
-    return [foam_porosity,vtk_out]
+    return [foam_porosity,vtk_out,found_cells]
+
+def vtk2txt(vtk_in,txt_out):
+    thread = subprocess.Popen(
+        ['vox_fill',
+         '-i', vtk_in,
+         '-o', txt_out,
+         '-f', 'txt',
+         '--radius', str(1),
+         '--step', str(1)])
+    thread.wait()
 
 def main():
     common.init_logging()

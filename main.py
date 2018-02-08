@@ -23,7 +23,7 @@ can handle
     foam relaxation
     foam analysis
 
-Input config file should include all informations for other modules se examples for example config.json
+Input config file should include all informations for other modules see examples/config.json
 '''
 def main():
     common.init_logging()
@@ -34,21 +34,31 @@ def main():
     parent_directory_path=common.getparrentdir(output_file)
     common.create_parent_directory(parent_directory_path)
 
+
+
     if args.generate:
         generate_config = config['generate']
-        foam_generate.generate_3d_neper(output_file, generate_config)
-        foam_convert.geo2fe(output_file+'.geo',output_file,generate_config['spheres-per-ellipsoid'])
-    if args.relax:
+        successful_generation=foam_generate.generate_3d_neper_and_fe(output_file, generate_config)
+        if not successful_generation:
+            return False
+
+    if args.relax_dry or args.relax_strut or args.relax_por or args.relax_all:
         relax_config = config['relax']
         relax_files = foam_relax.init_file_option(output_file+'_relaxed')
         relax_config.update(relax_files)
-        foam_relax.relax(output_file+'.fe',relax_config)
-    if args.relax_strut:
-        relax_config = config['relax']
-        relax_files = foam_relax.init_file_option(output_file + '_relaxed')
-        relax_config.update(relax_files)
-        foam_relax.relax_dry_foam(output_file + '.fe', relax_config)
-        foam_relax.optimize_strut_content(relax_config['relaxed-dry'], relax_config)
+        if args.diffusion:
+            relax_config['convert-vtk-to-txt'] = True
+        if args.relax_all:
+            foam_relax.relax_all(output_file+'.fe',relax_config)
+        else:
+            if args.relax_dry:
+                foam_relax.relax_dry_foam(output_file + '.fe', relax_config)
+            if args.relax_strut:
+                foam_relax.optimize_strut_content(relax_config['relaxed-dry'], relax_config)
+            if args.relax_por:
+                foam_relax.relax_porosity(relax_config)
+
+
     if args.analyze:
         analyze_config = config['analyze']
         if args.recursive:
@@ -59,29 +69,38 @@ def main():
             logging.info('Analyzing file:')
             print(json_file)
             foam_analyze.analyze_and_plot(json_file,'auto',analyze_config)
-
+    return True
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config-file",
+                        help="Json configuration file",
+                        metavar='FILE',
+                        type=str,
+                        required=True)
     parser.add_argument("-g", "--generate",
                         action='store_true',
-                        help="Generate foam according to settings in config file")
-    parser.add_argument("-r", "--relax",
+                        help="Generate foam according to settings in config file [output: geo,fe]")
+    parser.add_argument("-d", "--relax-dry",
                         action='store_true',
-                        help="Relax foam, optimize strut content and porosity according to settings in config file [output stl,vox]")
+                        help="Relax dry-foam, according to settings in config file [output: fe]")
     parser.add_argument("-s", "--relax-strut",
                         action='store_true',
-                        help="Relax foam and optimize strut concent, according to settings in config file [output: stl]")
+                        help="Create wet-foam structure, optimize strut content, according to settings in config file [output: fe,stl]")
+    parser.add_argument("-p", "--relax-por",
+                        action='store_true',
+                        help="Optimize foam porosity, according to settings in config file [output: vtk(vox)]")
+    parser.add_argument("-r", "--relax-all",
+                        action='store_true',
+                        help="Relax dry foam, prepare wet foam, optimize strut content and porosity according to settings in config file [output fe,stl,vtk(vox)]")
+    parser.add_argument("--diffusion",
+                        action='store_true',
+                        help="Create suitable file for diffusion simulation after porosity optimization[output txt]")
     parser.add_argument("-a", "--analyze",
                         action='store_true',
                         help="Analyze foam according to settings in config file")
     parser.add_argument("--recursive",
                         action='store_true',
                         help="Look for json files recursive in all subfolders.")
-    parser.add_argument("-c", "--config-file",
-                        help="Json configuration file",
-                        metavar='FILE',
-                        type=str,
-                        required=True)
     args = parser.parse_args()
     main()

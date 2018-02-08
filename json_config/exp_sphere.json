@@ -1,0 +1,23 @@
+{"output-file": "results/example_sphere/foam_sphere_test",
+"generate": {
+    "MUR": 0.14,
+    "SIGMAR": 0.01,
+    "num-cells": 27,
+    "packing-alg": "spdense",
+    "grow-alg": true
+},
+"relax": {
+	"porosity": 0.92,
+    "strut-content": 0.6,
+    "relax-cmd": "se_cmd/relaxNE5.cmd"
+},
+"analyze": {
+	"bins-cell": 12,	
+	"bins-edge": 50,
+	"spheres-per-ellipsoid": 1,
+	"edge-length": true, 
+	"cell-types": true
+}}
+
+
+
