@@ -16,7 +16,9 @@ The code depends on third-party applications, all must be callable from python/s
 
 ## Usage
 Example configuration files are located in examples
+
 Try run:
+
 	python main.py -c examples/example_sp1.json -gra
 	#Generate spherical packing, anneal the foam structure and optimize strut content and porosity
 	
