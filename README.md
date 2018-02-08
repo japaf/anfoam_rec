@@ -12,8 +12,13 @@ The code depends on third-party applications, all must be callable from python/s
 - `binvox` for generating voxel structure from ply format (http://www.patrickmin.com/binvox/)
 - `vox_fill` for filling empty holes in foam structure in voxel format
 - `evolver` for structure relaxation (http://facstaff.susqu.edu/brakke/evolver/evolver.html)
-PackingGeneration - for dense packing available on https://github.com/VasiliBaranov/packing-generation
+- `PackingGeneration` for dense sphere packing (https://github.com/VasiliBaranov/packing-generation)
 
 ## Usage
-$python main.py -c examples/example_sp1.json -gra
-$python main.py -c examples/example_el1.json -gra
+Example configuration files are located in examples
+Try run:
+	python main.py -c examples/example_sp1.json -gra
+	#Generate spherical packing, anneal the foam structure and optimize strut content and porosity
+	
+	python main.py -c examples/example_el1.json -gd
+	#Generate anisotropic packing, anneal the dry foam structure
