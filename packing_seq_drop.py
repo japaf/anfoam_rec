@@ -7,7 +7,6 @@ import os.path
 import numpy as np
 import random
 import common
-import mayavi_visu
 import time
 import packing_alg3d as pa
 """
@@ -90,7 +89,7 @@ def dropEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el,num_cell):
             j += 1
         print(j, maxx)
     logging.info('Volume fraction: %.3f Number of ellipsoids: %d', els_vol, len(els))
-    mayavi_visu.show_els(els)
+
     return els
 
 def rise_ellipsoid(e0,els,dx):

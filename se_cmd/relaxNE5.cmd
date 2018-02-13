@@ -119,7 +119,7 @@ eps:=0.01;
 epsrefine:=2.5;
 ehist;
 V;
-{ehist;refine edges where length>epsrefine*avg_elength;pop_in_cascade(eps*avg_elength);u 10;g 50} 30;
+{ehist;refine edges where length>epsrefine*avg_elength;pop_in_cascade(eps*avg_elength);u 10;g 50} 20;
 u 5;
 g 20;
 }

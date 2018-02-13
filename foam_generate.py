@@ -35,23 +35,33 @@ def generate_3d_neper(output_file,opt):
         MUYZ = opt['MUYZ']
         MUA = opt['MUA']
         SX = opt['SIGMAX']
+        SYZ = opt['SIGMAYZ']
         SA = opt['SIGMAA'] * np.pi / 180  # radians
         sp_per_el = opt['spheres-per-ellipsoid']
         logging.info('Generating ellipsoid packing (RSP)...')
-        ellipsoids = packing_alg3d.randEllipsoidPack(MUX,MUYZ,MUA,SX,SA,sp_per_el,num_cells)
+        ellipsoids = packing_alg3d.randEllipsoidPack(MUX,MUYZ,MUA,SX,SYZ,SA,sp_per_el,num_cells)
         if opt['grow-alg']:
             ellipsoids = packing_alg3d.ellipsoidGrow(ellipsoids, 1.05)
-
+    elif opt['packing-alg'] == 'eldense':
+        logging.info('Generating dense ellipsoid packing (RSP)...')
+        ellipsoids=packing_extalg3d.dense_ellipsoid_pack(opt['MUX'],opt['MUYZ'],opt['spheres-per-ellipsoid'],num_cells)
     elif opt['packing-alg']=='sprand':
+        opt['spheres-per-ellipsoid']=1
         logging.info('Generating sphere packing (RSP)...')
         ellipsoids = packing_alg3d.randSpherePack(MUR,SR,num_cells)
-        if 'grow-alg'in opt and opt['grow-alg']:
+        if 'grow-alg' in opt and opt['grow-alg']:
             ellipsoids = packing_alg3d.sphereGrow(ellipsoids, 1.05)
     #elif opt['packing-alg'] == 'elseqdrop':
     #    ellipsoids=packing_seq_drop.denseEllipsoidPack(MUX, MUY, MUZ, MUA, SX, SY, SZ, SA, sp_per_el, num_cells)
-    elif opt['packing-alg'] == 'densesp':
+    elif opt['packing-alg'] == 'spdense':
+        opt['spheres-per-ellipsoid']=1
         logging.info('Generating close sphere packing (RCP)...')
-        ellipsoids=packing_extalg3d.dense_sphere_pack(MUR,SR)
+        ellipsoids=packing_extalg3d.dense_sphere_pack(MUR,SR,num_cells)
+
+
+
+    if ellipsoids is None or len(ellipsoids)==0:
+        return False
 
     center_file=output_file+'_centers.txt'
     weights_file=output_file+'_weights.txt'
@@ -64,31 +74,34 @@ def generate_3d_neper(output_file,opt):
             px = el.pos[0] + sp.relpos[0]
             py = el.pos[1] + sp.relpos[1]
             pz = el.pos[2] + sp.relpos[2]
+
             fc.write('{0:f}\t{1:f}\t{2:f}\n'.format(px, py, pz))
             fw.write('{0:f}\n'.format(pr))
             seeds += 1
     fc.close()
     fw.close()
     exec_neper(output_file,seeds,center_file,weights_file)
+    return True
     #os.remove(center_file)
     #os.remove(rads_file)
 
 def generate_3d_neper_and_fe(output_file,opt):
-    for i in range(10):
-        generate_3d_neper(output_file, opt)
-        if os.path.isfile(output_file + '.fe'):
-            os.remove(output_file + '.fe')
-        successful_conversion=foam_convert.geo2fe(output_file+'.geo',output_file,opt['spheres-per-ellipsoid'])
+    maxi=10
+    for i in range(maxi):
+        successful_generation_neper=generate_3d_neper(output_file, opt)
+        successful_conversion = False
+        successful_generation = False
+        if successful_generation_neper:
+            successful_conversion=foam_convert.geo2fe(output_file+'.geo',output_file,opt['spheres-per-ellipsoid'])
         #test evolver file
-        successful_generation=False
         if successful_conversion:
             successful_generation=foam_convert.test_evolver(output_file + '.fe')
-        if not successful_generation or not successful_conversion:
+        if not successful_generation_neper or not successful_generation or not successful_conversion:
             logging.info("An error occured during foam generation or conversion to .fe file. Repeating generation...")
         else:
             logging.info("Foam structure was succesfully generated.")
             return True
-    logging.info("ERROR: Generation of structure failed!")
+    logging.error("Generation of structure failed %d times!",maxi)
     return False
 
 def exec_neper(output_file,seeds,center_file,rads_file):
@@ -101,7 +114,7 @@ def exec_neper(output_file,seeds,center_file,rads_file):
          '-o', output_file,
          '-format', 'geo'])
     thread.wait()
-    logging.info('Executing neper ... done')
+
 
 def main():
     common.init_logging()
@@ -123,7 +136,7 @@ def main():
     if args.grow_alg:
         configuration['grow-alg']=args.grow_alg
     common.create_parent_directory(output_file)
-    generate_3d_neper(output_file, configuration)
+    generate_3d_neper_and_fe(output_file, configuration)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -138,7 +151,7 @@ if __name__ == '__main__':
                         default="")
     parser.add_argument("-p", "--packing-alg",
                         help="Define packing algorithm",
-                        choices=['sprand', 'elrand','elseqdrop','densesp'],
+                        choices=['sprand', 'elrand','elseqdrop','spdense'],
                         default='densesp')
     parser.add_argument("-g", "--grow-alg",
                         help="Turn on grow algorihm",

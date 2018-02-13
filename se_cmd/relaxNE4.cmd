@@ -127,7 +127,7 @@ g 20;
 // 
 
 relax_wet:={
-g 100;u;{{u;g 20}}3;
+{u 5;g 20} 5;r;{u 5;g 20}3;
 }
 
 define facet attribute removeface integer

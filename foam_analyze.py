@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Analyze foam structure, can process json output file from evolver defining structure.
+"""
 
 import logging
 import os
@@ -70,13 +73,6 @@ _known_types = [
                     [2, 8, 5], [0, 12, 4]]
 
 
-
-
-
-
-
-
-
 def analyze_cell_anisotropy(cells):
     average_ratio_xy = 0.0
     average_ratio_xz = 0.0
@@ -99,12 +95,15 @@ def analyze_cell_anisotropy(cells):
     deviation_ratio_xz = np.sqrt(deviation_ratio_xz / len(cells) - average_ratio_xz ** 2)
     average_spatial_vector=average_spatial_vector/len(cells)
     average_spatial_vector=average_spatial_vector/np.linalg.norm(average_spatial_vector)
+    avg_anis=np.array([1.0, 1.0/average_ratio_xy, 1.0/average_ratio_xz])
+    avg_anis=avg_anis/np.min(avg_anis)
     anisotropy_results={
         'avg-xy':average_ratio_xy,
         'dev-xy':deviation_ratio_xy,
         'avg-xz':average_ratio_xz,
         'dev-xz':deviation_ratio_xz,
-        'spatial-vector':average_spatial_vector
+        'spatial-vector':average_spatial_vector,
+        'avg-anis': avg_anis
     }
     return anisotropy_results
 
@@ -121,6 +120,7 @@ def plot_cell_anisotropy(anisotropy_results,opt):
     print("XY: ",average_ratio_xy, deviation_ratio_xy)
     print("XZ: ",average_ratio_xz, deviation_ratio_xz)
     print("dir: ",average_spatial_vector)
+    print("axis: ",anisotropy_results['avg-anis'])
 
 def unwrap_points(points):
     '''
@@ -187,16 +187,21 @@ def analyze_equivalent_diameter(cells, bins):
         eq_diameters.append(get_equivalent_diameter(cell['volume']))
     [hist, min_val, max_val, domain_values, range_values] = get_histogram(eq_diameters, bins,0,np.max(eq_diameters))
     avg=np.average(eq_diameters)
-
+    dev=0
+    for val in eq_diameters:
+        dev+=val**2
+    dev=np.sqrt(dev/len(eq_diameters)-avg**2)
     cell_size_results={
         'hist': [hist, min_val, max_val, domain_values, range_values],
-        'avg': avg
+        'avg': avg,
+        'dev': dev
     }
     return cell_size_results
 
 def plot_equivalent_diameter(cell_size_results,opt):
     [hist, min_val, max_val, domain_values, range_values]=cell_size_results['hist']
     avg=cell_size_results['avg']
+    print ("d_eq = ",avg," +- ",cell_size_results['dev'])
     plt.clf()
     plt.xlabel('equivalent diameter [-]')
     plt.ylabel('partial fraction')
@@ -473,6 +478,17 @@ def analyze_angle(angle_data):
         vrc = (np.std(vertex))
         print(avg, vrc)
 
+def analyze_surface_area(facet_area_list,border_surfaces):
+    total_surface=0
+    for i in range(len(facet_area_list)-border_surfaces):
+            total_surface+=facet_area_list[i]
+    return [total_surface]
+
+def plot_total_surface(surface_area_results,opt):
+    outfile=opt['parent-directory'] + '_total_surface.dat'
+    total_surface=np.average(surface_area_results)
+    with open(outfile,'w') as stream:
+        stream.write(total_surface.__str__())
 
 def se_api_json_an(json_file, opt):
     data = json.load(open(json_file, 'r'))
@@ -504,6 +520,15 @@ def evolver_json_dry(json_file, opt):
     results['cell-anisotropy']=analyze_cell_anisotropy(data['cells'])
     results['cell-size'] =analyze_equivalent_diameter(data['cells'], opt['bins-cell'])
     results['angles'] =analyze_angles(data['angles'])
+    facet_area_list=[]
+    if 'facet-area' not in data:
+        for cell in data['cells']:
+            facet_area_list=facet_area_list+cell['facet-area']
+        for i in range(len(facet_area_list)):
+            facet_area_list[i]=facet_area_list[i]/2.0
+        results['total-surface'] = analyze_surface_area(facet_area_list, 0)
+    else:
+        results['total-surface'] = analyze_surface_area(data['facet-area'],0)
     return results
 
 def analyze_from_data(result_data,opt):
@@ -519,16 +544,22 @@ def analyze_from_data(result_data,opt):
         results['cell-size'] = analyze_equivalent_diameter(result_data['data-cells'], opt['bins-cell'])
     if 'data-angles' in result_data:
         results['angles'] = analyze_angles(result_data['data-angles'])
+    if 'total-surface' in result_data:
+        results['total-surface']=result_data['total-surface']
     return results
 
 def evolver_json_wet(json_file, opt):
     data = json.load(open(json_file, 'r'))
     border_body = data['border-body']
-    cells = data['cells'][:border_body - 1] + data['cells'][border_body:]
+    cells = data['cells'][:-1]# + data['cells'][border_body:]
     results = {}
-    results['data-cells'] = cells
-    results['cell-anisotropy'] = analyze_cell_anisotropy(cells)  # skip border body
-    results['cell-size'] = analyze_equivalent_diameter(cells,opt['bins-cell'])
+    if opt is not None:
+        results['data-cells'] = cells
+        results['cell-anisotropy'] = analyze_cell_anisotropy(cells)  # skip border body
+        results['cell-size'] = analyze_equivalent_diameter(cells,opt['bins-cell'])
+        for i in range(len(data['facet-area'])):
+            data['facet-area'][i]=data['facet-area'][i]/2.0
+    results['total-surface']= analyze_surface_area(data['facet-area'],len(cells))
     return results
 
 def plot_results(results,opt):
@@ -547,7 +578,8 @@ def plot_results(results,opt):
         plot_cell_anisotropy(results['cell-anisotropy'],opt)
     if 'cell-types' in results:
         analyze_cell_types(results['cell-types'], opt)
-
+    if 'total-surface' in results:
+        plot_total_surface(results['total-surface'],opt)
 
 def extract_data(list, item_name):
     # exract all data from dictionary list {{'item_name':value},{..}} => [value,...]
@@ -595,7 +627,10 @@ def main():
            'bins-cell': args.binscell,
            'bins-edge': args.binsedge,
            'spheres-per-ellipsoid': args.nvolpercell}
-    analyze(args.input_file,args.format,opt)
+    results=analyze(args.input_file,args.format,opt)
+    if opt['anisotropy']:
+        print('Foam anisotropy analysis:',results['cell-anisotropy']['avg-anis'])
+    print('Total surface area:',results['total-surface'])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

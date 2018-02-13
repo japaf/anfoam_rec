@@ -13,6 +13,28 @@ usage: an_dry_json >>> "andry.json"
 border_body:=0;
 
 //print analysis of dry foam in json format
+an_dry_facet_area:= {
+	foamface_mark; //functional, excludes struts
+	facet_area:=0;
+	foreach facet ff where fmark > 0 do
+		  { 
+			facet_area += ff.area;
+		  };
+	printf "%f, %f \n", facet_area, total_area;
+}
+
+an_wet_facet_area:= {
+	foamface_mark; //functional, excludes struts
+	facet_area:=0;
+	maxfmark:=foamface_count-max(bodies,id)+1;
+	foreach facet ff where fmark > 0 and fmark <= maxfmark do
+		  { 
+			facet_area += ff.area;
+		  };
+	printf "%f, %f \n", facet_area, total_area;
+}
+
+
 an_dry_json:= {
 	printf "{\"cell-types\": ";
 	foam_signature;
@@ -36,6 +58,19 @@ an_dry_json:= {
 		faces_area[ff.fmark] += ff.area;
 	  };
 	  printf ",\n";
+	  
+	  printf "\"facet-area\": [";
+	  first_output:=1;
+	  for ( inx := 1 ; inx <= foamface_count; inx += 1) { 
+			if first_output=1 then {
+				printf "%f",faces_area[inx];
+				first_output:=0;
+			} else {
+				printf ",%f",faces_area[inx];
+			};		
+	   };
+	   printf "],";  
+	   
 	  printf "\"angles\": ";
 	  printf "[";
 	  vvfirst:=1;
@@ -175,7 +210,10 @@ an_wet_json:= {
 	face_edge_counts := 0;
 	define face_perimeter real[foamedge_count];
 	define used_edges integer[foamedge_count];
+	faces_area:=0;
+	face_perimeter:=0;
 	edge_counted := 0;
+		
 	foreach edge ee where emark > 0 do
 	  { 
 		face_perimeter[ee.emark] += ee.length;
@@ -184,6 +222,20 @@ an_wet_json:= {
 	  { 
 		faces_area[ff.fmark] += ff.area;
 	  };
+	  
+	  printf "\"facet-area\": [";
+		  first_output:=1;
+		  for ( inx := 1 ; inx <= foamface_count; inx += 1) { 
+				if first_output=1 then {
+					printf "%f",faces_area[inx];
+					first_output:=0;
+				} else {
+					printf ",%f",faces_area[inx];
+				};		
+		   };
+			printf "],";
+			
+	 //cell info
 	  printf "\"cells\": [";
 	  first_cell_output:=1;
 	  foreach body bb do{
@@ -265,7 +317,7 @@ an_wet_json:= {
 
 /*
 To analyze wet foam
-usage: an_wet_json >>> "anwet.json"
+usage: an_wet_json >> "anwet.json"
 To analyze dry foam
 usage: an_dry_json >>> "andry.json"
 */

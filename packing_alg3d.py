@@ -11,7 +11,6 @@ import random
 import math
 import sys
 import json
-import mayavi_visu
 import common
 
 
@@ -143,14 +142,20 @@ def _randEllipsoidPack(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el,num_cell):
     :return:
     '''
     xmax= ymax= zmax =1.0
-    if num_cell==-1: #generate all
+    sf=1.0
+    if num_cell==-1: #generate non scaled cells
         num_cell=1e9
+    else:
+        #estimate scale parameter to make sure that specified number of cells can fit into the box
+        el_vol=4 / 3 * np.pi * MUX * MUY * MUZ
+        max_vol=0.35
+        sf=np.power(max_vol/num_cell/el_vol,1.0/3)
     els=[]
     random.seed()
-    ge=GeneratorEllipsoid(MUX,MUY,MUZ,MUA,SX,SY,SZ,SA,sp_per_el)
+    ge=GeneratorEllipsoid(MUX*sf,MUY*sf,MUZ*sf,MUA*sf,SX*sf,SY*sf,SZ*sf,SA*sf,sp_per_el)
     j = 0
     els_vol = 0
-    timeout = time.time() + 5
+    timeout = time.time() + 4.0+num_cell/50
     while j<num_cell:
         if time.time()>timeout:
             break
@@ -176,6 +181,10 @@ def randEllipsoidPack(MUX,MUYZ,MUA,SX,SA,sp_per_el,num_cell):
     log.info('Volume fraction: %.3f Number of ellipsoids: %d', els_vol, len(els))
     return els
 
+def randEllipsoidPack(MUX,MUYZ,MUA,SX,SYZ,SA,sp_per_el,num_cell):
+    els,els_vol=_randEllipsoidPack(MUX, MUYZ, MUYZ, MUA, SX, SYZ, SYZ, SA, sp_per_el, num_cell)
+    log.info('Volume fraction: %.3f Number of ellipsoids: %d', els_vol, len(els))
+    return els
 
 """
 Sphere packing algorithm - Random sequential adsorption (RSA)
@@ -208,7 +217,7 @@ def ellipsoidVol(els):
     return vol
 
 def _ellipsoidGrow(els,gf):
-    timeout = time.time() + 5
+    timeout = time.time()  + 4.0+len(els)/50
     while True:
         if time.time()>timeout:
             break
@@ -227,7 +236,7 @@ def _ellipsoidGrow(els,gf):
                             break
             if not inter:
                 els[i]=e0
-    print(ellipsoidVol(els))
+    logging.info('Inceased volume fraction: %.3f',ellipsoidVol(els))
     #mayavi_visu.show_els(els)
     return els
 

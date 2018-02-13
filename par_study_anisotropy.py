@@ -1,28 +1,24 @@
 #!/usr/bin/env python
 
-'''
-This script enables to repeatedly run random generation and annealing procedure, process and report results
-Create subdirectories 1,2,3...
-so for example
-"output-file": "results/example_sphere/foam_sphere_test"
-will result to files
-results/example_sphere/1/foam_sphere_test*.*
-results/example_sphere/2/foam_sphere_test*.*
-results/example_sphere/3/foam_sphere_test*.*
-'''
-
 import json
 import logging
 import os
-import argparse
-#local
+import numpy as np
 import common
 import foam_generate
 import foam_relax
 import foam_analyze
+import foam_convert
+
+import argparse
+
 
 __author__ = 'jiri1kolar'
 __email__ = "jiri1kolar@gmail.com"
+
+"""
+Run parametric study, compare different methods for creation of anisotropic foam structure 
+"""
 
 def main():
     common.init_logging()
@@ -44,10 +40,19 @@ def main():
                 generate_config = config['generate']
                 foam_generate.generate_3d_neper_and_fe(current_output_file, generate_config)
             if args.relax_strut or args.relax_porosity or args.relax_dry or args.diffusion:
+                if args.anisotropic_relax is not None:
+                    output_file_anis = current_output_file + '_anis'
+                    ax, by, cz = args.anisotropic_relax
+                    foam_relax.prepare_anisotropic_relax_fe(ax, by, cz, current_output_file + '.fe', output_file_anis + '.fe')
+                    current_output_file = output_file_anis
                 relax_config = config['relax']
                 if args.relax_cmd_file!="":
                     relax_config['relax-cmd'] = args.relax_cmd_file
-                relax_files = foam_relax.init_file_option(current_output_file + '_')
+                if args.scale_vector_before is not None:
+                    relax_config['scale-vector-before']=args.scale_vector_before
+                if args.scale_vector_after is not None:
+                    relax_config['scale-vector-after']=args.scale_vector_after
+                relax_files = foam_relax.init_file_option(current_output_file + '_relaxed')
                 relax_config.update(relax_files)
                 if args.relax_dry:
                     foam_relax.relax_dry_foam(current_output_file + '.fe', relax_config)
@@ -70,10 +75,15 @@ def main():
 
         files = {}
         relax_cmd_file_name = args.relax_cmd_file.split('/')[-1][:-4]
-        files['before-dry'] = common.find_files_recursively(parent_directory_path, '*before.dry.json')
-        files['after-dry'] = common.find_files_recursively(parent_directory_path, '*after.dry.json')
+        files['before-dry'] = common.find_files_recursively(parent_directory_path, '*_before.dry.json')
+        files['anis-before-dry'] = common.find_files_recursively(parent_directory_path, '*_anis_relaxed_an_before.dry.json')
+        files['after-dry'] = common.find_files_recursively(parent_directory_path, '*_after.dry.json')
+        files['anis-after-dry'] = common.find_files_recursively(parent_directory_path, '*_anis_relaxed_an_after.dry.json')
+        #filter _anis_relaxed* files from  after-dry and before-dry
+        files['before-dry']=[file for file in files['before-dry'] if file not in files['anis-before-dry']]
+        files['after-dry']=[file for file in files['after-dry'] if file not in files['anis-after-dry']]
         files['after-wet'] = common.find_files_recursively(parent_directory_path, '*.wet.json')
-        for key in ['before-dry', 'after-dry', 'after-wet']:  #
+        for key in ['before-dry','anis-before-dry', 'after-dry','anis-after-dry', 'after-wet']:  #
             if len(files[key]) > 0:
                 analyze_config['n-repetition'] = len(files[key])
                 logging.info('Analyzis of %s json files...', key)
@@ -152,5 +162,14 @@ if __name__ == '__main__':
                         help="Number of repetition",
                         type=int,
                         default=10)
+    parser.add_argument("--anisotropic-relax",
+                        nargs='*',
+                        help="Relax foam with set anisotropy ratio, supply three, space separated values: 1.5 1 1")
+    parser.add_argument("--scale-vector-before",
+                        nargs='*',
+                        help="Linear scale of axis before relaxation, supply three, space separated values: 1.5 1 1")
+    parser.add_argument("--scale-vector-after",
+                        nargs='*',
+                        help="Linear scale of axis after relaxation, supply three, space separated values: 1.5 1 1")
     args = parser.parse_args()
     main()

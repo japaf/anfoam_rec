@@ -1,10 +1,10 @@
-{"output-file": "results/example_sphere/foam_sphere_test",
+{"output-file": "results/example_sp2/foam_sp2",
 "generate": {
-    "MUR": 0.14,
+    "MUR": 0.15,
     "SIGMAR": 0.01,
     "num-cells": 27,
     "packing-alg": "spdense",
-    "grow-alg": true
+    "grow-alg": "True"
 },
 "relax": {
 	"porosity": 0.92,

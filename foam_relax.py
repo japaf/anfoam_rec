@@ -13,13 +13,13 @@ __author__ = 'jiri1kolar'
 __email__ = "jiri1kolar@gmail.com"
 #load logger
 
-def relax(fe_file,opt):
+def relax_all(fe_file,opt):
     relax_dry_foam(fe_file, opt)
     optimize_strut_content(opt['relaxed-dry'], opt)
     relax_porosity(opt)
 
 def relax_dry_foam(fe_file,opt):
-    relaxdryfoam_savefe(fe_file, opt['relaxed-dry'], opt['analyze-out'], opt['relax-cmd'])
+    relaxdryfoam_savefe(fe_file, opt['relaxed-dry'], opt['analyze-out'], opt['relax-cmd'],opt['scale-vector-before'],opt['scale-vector-after'])
 
 def relax_porosity(opt):
     ply_file = foam_convert.stlbox2ply(opt['stl-box-out'])
@@ -38,9 +38,16 @@ def optimize_strut_content(fe_file,opt):
     return [strut_content, opt_spread]
 
 def optimize_porosity(ply_file, opt):
-    logging.info('Optimizing porosity: Target %.3f ...',opt['porosity'])
-    resolution = newton_method_por(ply_file, opt['porosity'])
-    porosity,opt['vtk-out'] = foam_convert.execute_binvox(ply_file, resolution)
+    if 'const-res' in opt and opt['const-res']:
+        resolution=opt['resolution']
+    else:
+        logging.info('Optimizing porosity: Target %.3f ...',opt['porosity'])
+        resolution = newton_method_por(ply_file, opt['porosity'])
+    porosity,opt['vtk-out'],found_cells = foam_convert.execute_binvox(ply_file, resolution)
+    #convert to txt file for diff simulation
+    if 'convert-vtk-to-txt' in opt and opt['convert-vtk-to-txt']:
+        logging.info("Creating structure file format suitable for diffusion simulation")
+        foam_convert.vtk2txt(opt['vtk-out'], opt['txt_out'])
     strut_volume = strut_content2volume(opt['strut-content'], opt)
     # correction if porosity optimization failed than it shows real strut content
     opt['porosity'] = porosity
@@ -51,7 +58,16 @@ def optimize_porosity(ply_file, opt):
 
     return [porosity,resolution]
 
-def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
+def _scale_period_string(scale_vector_after):
+    return """period_x:=period_x*{0}
+period_y:=period_y*{1}
+period_z:=period_z*{2}
+set vertex x x*{0}
+set vertex y y*{1}
+set vertex z z*{2}\n""".format(*scale_vector_after)
+
+
+def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path,scale_vector_before,scale_vector_after):
     logging.info('Relaxing dry foam: %s',fe_dry)
     logging.info('\t used relax-cmd-file: %s', relax_cmd_path)
     tmpcmd = 'tmp_' + time.time().__str__() + '.cmd'
@@ -63,12 +79,16 @@ def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
         cmd_stream.write('read "se_cmd/an_foam.cmd"\n')
         cmd_stream.write('read "' + relax_cmd_path + '"\n')
         cmd_stream.write('connected\n')
+        if scale_vector_before != [1, 1, 1]:
+            cmd_stream.write(_scale_period_string(scale_vector_before))
         if analyze_file is not None:
             cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(analyze_file + '_before.dry.json'))
         cmd_stream.write('relax_dry\n')
-        cmd_stream.write('dump "{0:s}"\n'.format(fe_dry_relaxed))
+        if scale_vector_after != [1, 1, 1]:
+            cmd_stream.write(_scale_period_string(scale_vector_after))
         if analyze_file is not None:
             cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(analyze_file + '_after.dry.json'))
+        cmd_stream.write('dump "{0:s}"\n'.format(fe_dry_relaxed))
         cmd_stream.write('q\n')
         cmd_stream.write('q\n')
     success = foam_convert.execute_evolver(fe_dry, tmpcmd)
@@ -76,6 +96,24 @@ def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
     if not success:
         logging.info("Fatal error: Relax procedure for dryfoam failed!")
         exit()
+
+def modify_fe_file(fe_header,fe_footer,fe_file,fe_file_anisrelax):
+    with open(fe_file) as f:
+        lines=f.readlines()
+    with open(fe_file_anisrelax,'w') as f:
+        f.write(fe_header)
+        f.writelines(lines)
+        f.write(fe_footer)
+
+def prepare_anisotropic_relax_fe(ax,by,cz,fe_file,fe_file_anisrelax):
+    fe_header = """parameter axis_a = {0}
+parameter axis_b = {1}
+parameter axis_c = {2}
+quantity aniso energy method facet_general_integral global
+scalar_integrand:  sqrt(axis_a*x4^2 + axis_b*x5^2 + axis_c*x6^2) \n""".format(ax,by,cz)
+    fe_footer = """read\nset facet tension 0 \n"""
+    modify_fe_file(fe_header, fe_footer, fe_file, fe_file_anisrelax)
+
 
 def savewet(fe_dry,fe_wet,spread):
     tmpcmd='tmp_'+time.time().__str__()+'.cmd'
@@ -126,6 +164,7 @@ def relaxwetfoam_savestlandgeo(fe_wet,analyze_file,stl_out,relax_cmd_path):
     with open(foam_stat,'r') as stream:
         stat=json.load(stream)
         strut_volume=stat['volume']
+        total_area=stat['area']
     os.remove(foam_stat)
     return strut_volume
 
@@ -170,19 +209,19 @@ def obj_fn_strut(fe_dry,fe_wet,analysis_file,stl,spread,opt):
 def newton_method_por(ply_file,target_por):
     x=200
     minx=50
-    maxx=1500
+    maxx=1600
     dx=50
-    res0 = obj_fn_por(ply_file, x - dx) - target_por
-    print("Porosity\tError\tResolution")
+    res0 = obj_fn_por(ply_file, x - dx)[0] - target_por
+    print("Porosity\tError\tResolution\tFound cells")
     for i in range(30):
-        por=obj_fn_por(ply_file, x)
+        por,found_cells=obj_fn_por(ply_file, x)
         res1 = por - target_por
         df=(res1-res0)/dx
         res0=res1
         if abs(df) < 1e-5: return x
         newx=int(x-res0/df)
         dx=newx-x
-        print(por, res0, x)
+        print(por, res0, x,found_cells)
         if abs(x-newx)<2: return x
         if newx>maxx: newx=maxx
         if newx < minx: newx = minx
@@ -191,18 +230,19 @@ def newton_method_por(ply_file,target_por):
     return x
 
 def obj_fn_por(ply_file,resolution):
-    porosity,vtk_file= foam_convert.execute_binvox(ply_file, resolution)
+    porosity,vtk_file,found_cells= foam_convert.execute_binvox(ply_file, resolution)
     os.remove(vtk_file)
-    return porosity
+    return [porosity,found_cells]
 
 def init_file_option(output_file):
     opt = {'stl-out': output_file + '.stl',
             'stl-box-out': output_file + 'Box.stl',
             'ply-out': output_file + '.ply',
-            'relaxed-dry': output_file+'dryrelaxed.fe',
+            'relaxed-dry': output_file+'_dry.fe',
             'analyze-out': output_file+'_an',
-            'wet-out': output_file + '.fe',
-            'vox-out': output_file + '.vtk'}
+            'wet-out': output_file + 'wet.fe',
+            'vox-out': output_file + '.vtk',
+            'txt_out': output_file + '.txt'}
     return opt
 
 def main():
@@ -211,7 +251,7 @@ def main():
     opt['porosity']=args.porosity
     opt['strut-content']=args.strut_content
     opt['relax-cmd']=args.relax_cmd_file
-    relax(args.input_file,opt)
+    relax_all(args.input_file,opt)
     #elif args.convert=='evolver':
     #    vox_file=stl2vox(args.input_file,args.resolution)
 

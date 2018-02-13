@@ -3,6 +3,7 @@ __author__ = 'jiri1kolar'
 import logging
 import distutils.spawn as ds
 import os
+import sys
 import fnmatch
 
 def init_logging():
@@ -10,6 +11,10 @@ def init_logging():
             level=logging.DEBUG,
             format='%(asctime)s [%(levelname)s] %(module)s - %(message)s',
             datefmt='%H:%M:%S')
+
+def critical_error_exit(msg):
+    logging.critical(msg)
+    sys.exit()
 
 def check_exec(exec_name):
     return ds.find_executable(exec_name)
@@ -42,3 +47,5 @@ def find_files(directory,pattern_path):
 
 def getparrentdir(path):
     return path[:-len(path.split('/')[-1])]
+
+

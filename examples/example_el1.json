@@ -1,4 +1,4 @@
-{"output-file": "results/example_dispell/foam_dispell_test",
+{"output-file": "results/example_el1/foam_el1",
 "generate": {
     "MUX": 0.15,
     "MUYZ": 0.1,
@@ -8,12 +8,12 @@
     "SIGMAA": 15,
     "spheres-per-ellipsoid": 9,
     "num-cells": 27,
-    "packing-alg": "eldense",
+    "packing-alg": "elrand",
     "grow-alg": "True"
 },
 "relax": {
-	"porosity": 0.93,
-    "strut-content": 0.4,
+	"porosity": 0.92,
+    "strut-content": 0.6,
     "relax-cmd": "se_cmd/relaxNE5.cmd"
 },
 "analyze": {
