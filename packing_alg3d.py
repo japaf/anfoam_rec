@@ -11,7 +11,6 @@ import random
 import math
 import sys
 import json
-import mayavi_visu
 import common
 
 

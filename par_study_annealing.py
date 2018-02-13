@@ -6,9 +6,9 @@ Create subdirectories 1,2,3...
 so for example
 "output-file": "results/example_sphere/foam_sphere_test"
 will result to files
-results/example_sphere/1/foam_sphere_test
-results/example_sphere/2/foam_sphere_test
-results/example_sphere/3/foam_sphere_test
+results/example_sphere/1/foam_sphere_test*.*
+results/example_sphere/2/foam_sphere_test*.*
+results/example_sphere/3/foam_sphere_test*.*
 '''
 
 import json
@@ -34,7 +34,7 @@ def main():
     common.create_parent_directory(parent_directory_path)
     zeros = "000"
     logging.info("Testing: %s", parent_directory_path)
-    if args.generate or args.relax_strut or args.relax_porosity or args.relax or args.diffusion:
+    if args.generate or args.relax_strut or args.relax_porosity or args.relax_dry or args.diffusion:
         for i in range(args.nrepetition):
             current_dir = zeros[len(str(i + 1)):] + str(i + 1)
             logging.info("Run %s", current_dir)

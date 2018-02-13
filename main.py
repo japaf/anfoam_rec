@@ -43,6 +43,11 @@ def main():
             return False
 
     if args.relax_dry or args.relax_strut or args.relax_por or args.relax_all:
+        if args.anisotropic_relax is not None:
+            output_file_anis=output_file+'_anis'
+            ax,by,cz=args.anisotropic_relax
+            foam_relax.prepare_anisotropic_relax_fe(ax,by,cz,output_file+'.fe',output_file_anis+'.fe')
+            output_file=output_file_anis
         relax_config = config['relax']
         relax_files = foam_relax.init_file_option(output_file+'_relaxed')
         relax_config.update(relax_files)
@@ -102,5 +107,8 @@ if __name__ == '__main__':
     parser.add_argument("--recursive",
                         action='store_true',
                         help="Look for json files recursive in all subfolders.")
+    parser.add_argument("--anisotropic-relax",
+                        nargs='*',
+                        help="Relax foam with set anisotropy ratio, supply three, space separated values: 1.5 1 1")
     args = parser.parse_args()
     main()

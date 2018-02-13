@@ -8,12 +8,12 @@
     "SIGMAA": 15,
     "spheres-per-ellipsoid": 9,
     "num-cells": 27,
-    "packing-alg": "elrand",
+    "packing-alg": "eldense",
     "grow-alg": "True"
 },
 "relax": {
-	"porosity": 0.92,
-    "strut-content": 0.6,
+	"porosity": 0.93,
+    "strut-content": 0.4,
     "relax-cmd": "se_cmd/relaxNE5.cmd"
 },
 "analyze": {

@@ -42,7 +42,9 @@ def generate_3d_neper(output_file,opt):
         ellipsoids = packing_alg3d.randEllipsoidPack(MUX,MUYZ,MUA,SX,SYZ,SA,sp_per_el,num_cells)
         if opt['grow-alg']:
             ellipsoids = packing_alg3d.ellipsoidGrow(ellipsoids, 1.05)
-
+    elif opt['packing-alg'] == 'eldense':
+        logging.info('Generating dense ellipsoid packing (RSP)...')
+        ellipsoids=packing_extalg3d.dense_ellipsoid_pack(opt['MUX'],opt['MUYZ'],opt['spheres-per-ellipsoid'],num_cells)
     elif opt['packing-alg']=='sprand':
         opt['spheres-per-ellipsoid']=1
         logging.info('Generating sphere packing (RSP)...')
@@ -55,6 +57,8 @@ def generate_3d_neper(output_file,opt):
         opt['spheres-per-ellipsoid']=1
         logging.info('Generating close sphere packing (RCP)...')
         ellipsoids=packing_extalg3d.dense_sphere_pack(MUR,SR,num_cells)
+
+
 
     if ellipsoids is None or len(ellipsoids)==0:
         return False
@@ -70,6 +74,7 @@ def generate_3d_neper(output_file,opt):
             px = el.pos[0] + sp.relpos[0]
             py = el.pos[1] + sp.relpos[1]
             pz = el.pos[2] + sp.relpos[2]
+
             fc.write('{0:f}\t{1:f}\t{2:f}\n'.format(px, py, pz))
             fw.write('{0:f}\n'.format(pr))
             seeds += 1

@@ -19,7 +19,7 @@ def relax_all(fe_file,opt):
     relax_porosity(opt)
 
 def relax_dry_foam(fe_file,opt):
-    relaxdryfoam_savefe(fe_file, opt['relaxed-dry'], opt['analyze-out'], opt['relax-cmd'])
+    relaxdryfoam_savefe(fe_file, opt['relaxed-dry'], opt['analyze-out'], opt['relax-cmd'],opt['scale-vector-before'],opt['scale-vector-after'])
 
 def relax_porosity(opt):
     ply_file = foam_convert.stlbox2ply(opt['stl-box-out'])
@@ -58,7 +58,16 @@ def optimize_porosity(ply_file, opt):
 
     return [porosity,resolution]
 
-def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
+def _scale_period_string(scale_vector_after):
+    return """period_x:=period_x*{0}
+period_y:=period_y*{1}
+period_z:=period_z*{2}
+set vertex x x*{0}
+set vertex y y*{1}
+set vertex z z*{2}\n""".format(*scale_vector_after)
+
+
+def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path,scale_vector_before,scale_vector_after):
     logging.info('Relaxing dry foam: %s',fe_dry)
     logging.info('\t used relax-cmd-file: %s', relax_cmd_path)
     tmpcmd = 'tmp_' + time.time().__str__() + '.cmd'
@@ -70,12 +79,16 @@ def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
         cmd_stream.write('read "se_cmd/an_foam.cmd"\n')
         cmd_stream.write('read "' + relax_cmd_path + '"\n')
         cmd_stream.write('connected\n')
+        if scale_vector_before != [1, 1, 1]:
+            cmd_stream.write(_scale_period_string(scale_vector_before))
         if analyze_file is not None:
             cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(analyze_file + '_before.dry.json'))
         cmd_stream.write('relax_dry\n')
-        cmd_stream.write('dump "{0:s}"\n'.format(fe_dry_relaxed))
+        if scale_vector_after != [1, 1, 1]:
+            cmd_stream.write(_scale_period_string(scale_vector_after))
         if analyze_file is not None:
             cmd_stream.write(' an_dry_json >>> "{0:s}"\n'.format(analyze_file + '_after.dry.json'))
+        cmd_stream.write('dump "{0:s}"\n'.format(fe_dry_relaxed))
         cmd_stream.write('q\n')
         cmd_stream.write('q\n')
     success = foam_convert.execute_evolver(fe_dry, tmpcmd)
@@ -83,6 +96,24 @@ def relaxdryfoam_savefe(fe_dry,fe_dry_relaxed,analyze_file,relax_cmd_path):
     if not success:
         logging.info("Fatal error: Relax procedure for dryfoam failed!")
         exit()
+
+def modify_fe_file(fe_header,fe_footer,fe_file,fe_file_anisrelax):
+    with open(fe_file) as f:
+        lines=f.readlines()
+    with open(fe_file_anisrelax,'w') as f:
+        f.write(fe_header)
+        f.writelines(lines)
+        f.write(fe_footer)
+
+def prepare_anisotropic_relax_fe(ax,by,cz,fe_file,fe_file_anisrelax):
+    fe_header = """parameter axis_a = {0}
+parameter axis_b = {1}
+parameter axis_c = {2}
+quantity aniso energy method facet_general_integral global
+scalar_integrand:  sqrt(axis_a*x4^2 + axis_b*x5^2 + axis_c*x6^2) \n""".format(ax,by,cz)
+    fe_footer = """read\nset facet tension 0 \n"""
+    modify_fe_file(fe_header, fe_footer, fe_file, fe_file_anisrelax)
+
 
 def savewet(fe_dry,fe_wet,spread):
     tmpcmd='tmp_'+time.time().__str__()+'.cmd'
@@ -207,7 +238,7 @@ def init_file_option(output_file):
     opt = {'stl-out': output_file + '.stl',
             'stl-box-out': output_file + 'Box.stl',
             'ply-out': output_file + '.ply',
-            'relaxed-dry': output_file+'dry.fe',
+            'relaxed-dry': output_file+'_dry.fe',
             'analyze-out': output_file+'_an',
             'wet-out': output_file + 'wet.fe',
             'vox-out': output_file + '.vtk',
