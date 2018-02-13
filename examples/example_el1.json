@@ -14,6 +14,8 @@
 "relax": {
 	"porosity": 0.92,
     "strut-content": 0.6,
+    "scale-vector-before": [1,1,1],
+    "scale-vector-after": [1,1,1],
     "relax-cmd": "se_cmd/relaxNE5.cmd"
 },
 "analyze": {
