@@ -9,10 +9,20 @@
 "relax": {
 	"porosity": 0.92,
     "strut-content": 0.6,
-    "relax-cmd": "se_cmd/relaxNE5.cmd"
+    "relax-cmd": "se_cmd/relaxNE5.cmd",
+    "scale-vector-before": [
+        1,
+        1,
+        1
+    ],
+    "scale-vector-after": [
+        1,
+        1,
+        1
+    ]
 },
 "analyze": {
-	"bins-cell": 12,	
+	"bins-cell": 12,
 	"bins-edge": 50,
 	"spheres-per-ellipsoid": 1,
 	"all": true

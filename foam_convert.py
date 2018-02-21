@@ -83,7 +83,7 @@ def execute_evolver(fe_file,cmd_file):
         ['evolver',
          '-x', # exit if an error occur
          '-f', cmd_file,
-         fe_file],stderr=subprocess.PIPE,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
+         fe_file],stderr=subprocess.PIPE)#,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
     thread.wait()
     warning_count=0
     error_count=0
@@ -105,7 +105,7 @@ def execute_evolver_test(fe_file,cmd_file):
         ['evolver',
          '-x', # exit if an error occur
          '-f', cmd_file,
-         fe_file],stderr=subprocess.PIPE,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
+         fe_file],stderr=subprocess.PIPE)#,stdout=subprocess.DEVNULL) # stdout=subprocess.DEVNULL
     thread.wait()
     warning_count=0
     error_count=0
